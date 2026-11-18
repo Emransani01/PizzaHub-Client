@@ -152,6 +152,12 @@ unreachable the sections degrade gracefully instead of failing the build.
 Client pages fetch through `apiFetch` inside effects and render explicit loading,
 empty and error states.
 
+Instant-navigation validation therefore runs in `manual-warning` mode: the
+dashboard pages are interactive client components that only render after the
+session resolves, so automatic validation would always observe the
+"Checking your access" shell. Routes can still opt in with `export const instant`
+once they are ready.
+
 ## Lint note
 
 `eslint.config.mjs` disables exactly one React Compiler rule,
