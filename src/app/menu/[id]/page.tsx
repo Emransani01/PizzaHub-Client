@@ -107,7 +107,7 @@ export default function MenuItemPage() {
                     src={item.images[activeImage] ?? FALLBACK_FOOD_IMAGE}
                     alt={item.itemName}
                     fill
-                    priority
+                    loading="eager"
                     sizes="(min-width: 1024px) 60vw, 100vw"
                     className="object-cover"
                   />

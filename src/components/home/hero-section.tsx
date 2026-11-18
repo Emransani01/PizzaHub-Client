@@ -10,7 +10,8 @@ export function HeroSection() {
         src="/images/home/hero-bg.jpg"
         alt=""
         fill
-        priority
+        loading="eager"
+        fetchPriority="high"
         sizes="100vw"
         className="object-cover object-center opacity-40"
       />
@@ -101,7 +102,7 @@ export function HeroSection() {
               src="/images/home/hero-pizza.jpg"
               alt="Stone-baked pizza with melted mozzarella, basil and blistered crust"
               fill
-              priority
+              loading="eager"
               sizes="(min-width: 1024px) 520px, (min-width: 640px) 480px, 86vw"
               className="object-cover object-[38%_center]"
             />
