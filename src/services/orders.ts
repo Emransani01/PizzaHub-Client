@@ -1,0 +1,40 @@
+import { apiFetch } from "@/lib/api";
+import type { Order, OrderStatus, Paginated } from "@/types";
+
+export interface CreateOrderInput {
+  itemId: string;
+  deliveryDate: string;
+  deliveryAddress: string;
+  message?: string;
+}
+
+export function createOrder(input: CreateOrderInput): Promise<Order> {
+  return apiFetch<Order>("/orders", { method: "POST", body: input });
+}
+
+export function listOrders(query: {
+  status?: OrderStatus;
+  page?: number;
+  limit?: number;
+} = {}): Promise<Paginated<Order>> {
+  const params = new URLSearchParams();
+  if (query.status) params.set("status", query.status);
+  params.set("page", String(query.page ?? 1));
+  params.set("limit", String(query.limit ?? 10));
+  return apiFetch<Paginated<Order>>(`/orders?${params.toString()}`);
+}
+
+export function getOrder(id: string): Promise<Order> {
+  return apiFetch<Order>(`/orders/${id}`);
+}
+
+export function updateOrderStatus(
+  id: string,
+  status: Extract<OrderStatus, "accepted" | "rejected" | "cancelled">,
+  note?: string,
+): Promise<Order> {
+  return apiFetch<Order>(`/orders/${id}/status`, {
+    method: "PATCH",
+    body: { status, note },
+  });
+}
