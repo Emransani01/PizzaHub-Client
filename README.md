@@ -1,36 +1,190 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PizzaHub Web
 
-## Getting Started
+The Next.js client for PizzaHub, a multi-vendor pizza ordering platform. It
+pairs with the Express API in `../server`.
 
-First, run the development server:
+The visual identity (cream/brown/red palette, typography, spacing, hero,
+category cards, animations and footer) is the approved design from earlier
+iterations. This build keeps that design and wires every page to the real API —
+there is no demo or placeholder data left in the UI.
+
+## Tech stack
+
+| Layer | Choice |
+| --- | --- |
+| Framework | Next.js 16 (App Router, Turbopack, Cache Components) |
+| Language | TypeScript |
+| Styling | Tailwind CSS v4 + the existing design tokens |
+| UI | Local shadcn/base-ui components, Lucide icons, Sonner toasts |
+| Auth client | `better-auth/react` |
+| API transport | `fetch` wrapper with in-memory JWT and automatic refresh |
+
+## Requirements
+
+- Node.js 20 or newer
+- npm 10 or newer
+- The PizzaHub API running (see `../server/README.md`)
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd client
+npm install
+cp .env.example .env.local     # Windows: copy .env.example .env.local
+npm run dev                    # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Environment variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `API_URL` | no | Origin of the Express API. Defaults to `http://localhost:5000`. Used by the `/api/*` rewrite and by the homepage's server-side fetches. |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+That is the only variable the client needs. Every secret (MongoDB URI, Better
+Auth secret, JWT secret, Stripe keys, ImgBB key, Google OAuth credentials) lives
+in `server/.env` only and is never exposed to the browser.
 
-## Learn More
+### Same-origin API
 
-To learn more about Next.js, take a look at the following resources:
+`next.config.ts` rewrites `/api/:path*` to `${API_URL}/api/:path*`. Because the
+browser only ever talks to the Next.js origin:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- the Better Auth session cookie is first-party, so OAuth callbacks and cookie
+  refreshes work without SameSite workarounds,
+- no CORS preflight is needed in the browser,
+- no API host is baked into client bundles.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+For deployment, point `API_URL` at the public API origin (for example
+`https://pizzahub-api.example.com`) and set the server's `CLIENT_URL` /
+`BETTER_AUTH_URL` to the deployed frontend origin.
 
-## Deploy on Vercel
+## Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Start the dev server on port 3000. |
+| `npm run build` | Production build (also runs the TypeScript check). |
+| `npm start` | Serve the production build. |
+| `npm run lint` | ESLint with the Next.js core-web-vitals + TypeScript configs. |
+| `npx tsc --noEmit` | Standalone type check. |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Authentication flow
+
+1. Sign-up and sign-in go through Better Auth (`authClient.signIn.email`,
+   `authClient.signUp.email`). New accounts are always created as customers.
+2. After sign-up the user chooses **customer** or **vendor** on `/choose-role`
+   (or during sign-up). The role is written once through
+   `POST /api/users/me/role`. `admin` can never be selected in the UI and the
+   API rejects it.
+3. `AuthProvider` calls `GET /api/auth/token`, which exchanges the HttpOnly
+   session cookie for a **15-minute JWT kept in a module variable** — never in
+   `localStorage` or a readable cookie.
+4. `apiFetch` attaches `Authorization: Bearer <token>`. On `401` it asks for a
+   fresh token once and retries the request.
+5. Signing out clears the token and the session cookie. Blocked accounts get an
+   explanatory error instead of a session.
+
+`src/proxy.ts` performs a cookie-presence check for nicer navigation. It is a UX
+shortcut only; every real permission check happens in the Express API.
+
+### Role-based dashboards
+
+`/dashboard` redirects to the signed-in user's home. `src/app/dashboard/layout.tsx`
+guards the vendor and admin sections client-side and shows a loader while the
+session resolves. The API independently enforces every rule, so hiding a link is
+never the security boundary.
+
+| Role | Dashboard |
+| --- | --- |
+| customer | Overview, my orders (filters, cancel while pending, status timeline), favourites |
+| vendor | Overview, my menu items, add/edit item, customer orders, subscription |
+| admin | Overview, manage users, approve/reject menu items, read-only transactions |
+
+## Pages
+
+| Route | Description |
+| --- | --- |
+| `/` | Homepage: live featured dishes, category cards, how it works, vendor CTA |
+| `/browse-menu` | Search, category/location filters, sorting, pagination |
+| `/menu/[id]` | Item gallery, details, favourite toggle, order form (no payment) |
+| `/favorites` | The signed-in customer's saved dishes |
+| `/sign-in`, `/sign-up`, `/choose-role` | Authentication and role onboarding |
+| `/profile-settings` | Name, avatar (ImgBB upload), vendor business name |
+| `/dashboard/customer` | Customer overview |
+| `/dashboard/customer/my-orders` | Order history, cancellation, status timeline |
+| `/dashboard/vendor` | Kitchen overview with free-plan usage |
+| `/dashboard/vendor/my-menu-items` | Availability toggle, edit, delete |
+| `/dashboard/vendor/add-menu-item` | Create a listing (goes to admin review) |
+| `/dashboard/vendor/my-menu-items/[id]/edit` | Edit a listing (content edits need re-approval) |
+| `/dashboard/vendor/customer-orders` | Accept/reject orders with an optional note |
+| `/dashboard/vendor/subscription` | Free vs Premium, Stripe checkout, payment history |
+| `/dashboard/admin` | Platform overview |
+| `/dashboard/admin/manage-users` | Search/filter accounts, block/unblock |
+| `/dashboard/admin/manage-menu-items` | Approve or reject with a reason |
+| `/dashboard/admin/transactions` | Read-only Stripe records |
+| `/payment-success` | Polls the checkout status; never grants Premium itself |
+| `/payment-cancel` | Explains that no payment was taken |
+
+## Business rules reflected in the UI
+
+- **Customer orders are free.** There is no card step anywhere in the order
+  flow; Stripe is only reachable from the vendor subscription page.
+- **Free vendors** can hold 3 approved-and-available items. The dashboard shows
+  usage, and creating/updating beyond the cap fails with the server's message.
+  Pending and rejected items do not count.
+- **Premium** is activated only by the verified Stripe webhook. `/payment-success`
+  polls `GET /api/subscriptions/checkout/:sessionId` and reports the transaction
+  status; it never upgrades the account.
+- **Approval lifecycle:** new and content-edited items are `pending` until an
+  admin approves them. Rejections carry an optional reason shown to the vendor.
+- **Order timeline:** every accepted/rejected/cancelled transition is listed with
+  its actor role, timestamp and note.
+- **Favourites** are stored per account, not per browser.
+- **Transactions** are read-only for administrators; the UI states this and there
+  is no edit control.
+
+## Server-side rendering notes
+
+The homepage fetches live menu data on the server through
+`src/lib/server-api.ts`. Those fetches call `connection()` so they run per
+request instead of being frozen into the static prerender; if the API is
+unreachable the sections degrade gracefully instead of failing the build.
+Client pages fetch through `apiFetch` inside effects and render explicit loading,
+empty and error states.
+
+## Lint note
+
+`eslint.config.mjs` disables exactly one React Compiler rule,
+`react-hooks/set-state-in-effect`. The client fetches data with
+`useEffect` + `fetch` (no data-fetching library), and that rule flags the
+synchronous `setLoading(true)` / `setError(null)` at the start of such effects.
+All other hooks rules stay enabled.
+
+## Deployment notes
+
+- Deploy the API first, then set `API_URL` to its public HTTPS origin and build
+  the client.
+- Set the API's `CLIENT_URL` and `BETTER_AUTH_URL` to the deployed client origin.
+- Configure the Google OAuth redirect URI as
+  `<CLIENT_ORIGIN>/api/auth/callback/google`.
+- Point the Stripe webhook at `<API_URL>/api/subscriptions/webhook`; the success
+  URL should be `<CLIENT_ORIGIN>/payment-success` and the cancel URL
+  `<CLIENT_ORIGIN>/payment-cancel`.
+- Remote images are allowed from `i.ibb.co`, `ibb.co` and
+  `images.unsplash.com` (see `next.config.ts`). Add any new image host there.
+
+## Project layout
+
+```
+client/
+  src/
+    app/            routes (App Router)
+    components/     home, menu, dashboard, forms, shared and ui components
+    constants/      routes, labels, categories, dashboard navigation
+    lib/            api transport, auth client, server fetches, utils
+    providers/      auth and app-wide providers
+    services/       typed API wrappers per domain
+    types/          shared API types
+  next.config.ts    /api rewrite and remote image allowlist
+  src/proxy.ts      cookie-presence navigation guard (UX only)
+```
