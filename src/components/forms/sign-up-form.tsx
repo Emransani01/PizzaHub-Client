@@ -65,8 +65,10 @@ export function SignUpForm() {
       setError("Enter your email address.");
       return;
     }
-    if (password.length < 6) {
-      setError("Your password must be at least 6 characters long.");
+    if (!/^(?=.*[a-z])(?=.*[A-Z]).{6,}$/.test(password)) {
+      setError(
+        "Use at least 6 characters with one uppercase and one lowercase letter.",
+      );
       return;
     }
     if (role === "vendor" && businessName.trim().length < 2) {
@@ -293,7 +295,7 @@ export function SignUpForm() {
             autoComplete="new-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="At least 6 characters"
+            placeholder="6+ characters, upper and lower case"
             className={inputClass}
           />
         </div>
