@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import { MenuItemForm } from "@/components/dashboard/menu-item-form";
 import { PageHeader } from "@/components/shared/page-header";
+import { buttonVariants } from "@/components/ui/button";
 import { ROUTES } from "@/constants";
 import { errorMessage } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { getSubscriptionStatus } from "@/services/subscriptions";
 import type { SubscriptionStatus } from "@/types";
 
@@ -36,7 +38,7 @@ export default function AddMenuItemPage() {
       >
         <Link
           href={ROUTES.vendorMyMenuItems}
-          className="inline-flex items-center rounded-full border border-brand-brown/15 bg-white px-4 py-2 text-sm font-bold text-brand-brown transition-colors hover:border-brand-red hover:text-brand-red"
+          className={cn(buttonVariants({ variant: "brandOutline", size: "cta-sm" }))}
         >
           Back to my menu
         </Link>
@@ -57,8 +59,8 @@ export default function AddMenuItemPage() {
       ) : null}
 
       {error ? (
-        <p className="flex items-center gap-2 rounded-xl border border-brand-red/30 bg-white px-4 py-3 text-sm font-semibold text-brand-red">
-          <Loader2 aria-hidden="true" className="size-4" />
+        <p className="flex items-center gap-2 rounded-panel border border-brand-red/30 bg-card px-4 py-3 text-sm font-semibold text-brand-red shadow-card">
+          <CircleAlert aria-hidden="true" className="size-4 shrink-0" />
           {error}
         </p>
       ) : (

@@ -12,10 +12,10 @@ export default function DashboardNotFound() {
           This dashboard route does not exist.
         </p>
         <Link
-          href={ROUTES.dashboardCustomer}
+          href={ROUTES.dashboard}
           className={cn(buttonVariants({ variant: "outline" }))}
         >
-          Customer Dashboard
+          Go to Dashboard
         </Link>
       </div>
     </div>

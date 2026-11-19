@@ -60,7 +60,7 @@ export default function MyMenuItemsPage() {
       toast.success(
         updated.isAvailable
           ? "Item is now available to order."
-          : "Item hidden from customers.",
+          : "Item is now inactive and hidden from customers.",
       );
     } catch (cause) {
       toast.error(errorMessage(cause));
@@ -158,7 +158,10 @@ export default function MyMenuItemsPage() {
                   <h3 className="truncate text-sm font-extrabold text-brand-brown">
                     {item.itemName}
                   </h3>
-                  <MenuStatusBadge status={item.status} />
+                  <MenuStatusBadge
+                    status={item.status}
+                    isAvailable={item.isAvailable}
+                  />
                 </div>
                 <p className="mt-0.5 truncate text-xs text-brand-brown/50">
                   {item.category} · {formatCurrency(item.price)}
@@ -186,7 +189,7 @@ export default function MyMenuItemsPage() {
                       ? "Saving…"
                       : item.isAvailable
                         ? "Available"
-                        : "Unavailable"}
+                        : "Inactive"}
                   </button>
 
                   <Link

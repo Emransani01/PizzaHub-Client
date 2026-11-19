@@ -2,13 +2,16 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, ArrowRight, CircleAlert, SlidersHorizontal } from "lucide-react";
 import { MenuFilters } from "@/components/menu/menu-filters";
 import { MenuGrid } from "@/components/menu/menu-grid";
 import { MenuSearch } from "@/components/menu/menu-search";
+import { EmptyState } from "@/components/shared/empty-state";
 import { Footer } from "@/components/shared/footer";
 import { Navbar } from "@/components/shared/navbar";
+import { buttonVariants } from "@/components/ui/button";
 import { errorMessage } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { listMenuItems } from "@/services/menu";
 import type { MenuItem, Paginated } from "@/types";
 
@@ -34,6 +37,7 @@ function BrowseMenuContent() {
   const [data, setData] = useState<Paginated<MenuItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const firstRender = useRef(true);
 
   const updateQuery = useCallback(
@@ -96,20 +100,18 @@ function BrowseMenuContent() {
       });
 
     return () => controller.abort();
-  }, [category, sort, page, debouncedSearch]);
+  }, [category, sort, page, debouncedSearch, reloadKey]);
 
   return (
     <div className="flex min-h-screen flex-col bg-cream">
       <Navbar />
-      <main className="flex-1">
+      <main id="main-content" className="flex-1">
         <section className="border-b border-brand-brown/10 bg-cream-deep/50 py-12 sm:py-16">
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-brand-red">
               Live menu
             </p>
-            <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-brand-brown sm:text-4xl">
-              Browse the menu
-            </h1>
+            <h1 className="page-title mt-3">Browse the menu</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-brand-brown/60 sm:text-base">
               Every dish below is approved by an administrator and currently
               available from its kitchen.
@@ -131,7 +133,7 @@ function BrowseMenuContent() {
                   onChange={(event) =>
                     updateQuery({ sort: event.target.value, page: 1 })
                   }
-                  className="h-11 rounded-full border border-brand-brown/15 bg-white px-4 text-sm font-semibold text-brand-brown outline-none focus:border-brand-red"
+                  className="h-11 rounded-full border border-brand-brown/15 bg-card px-4 text-sm font-semibold text-brand-brown outline-none focus:border-brand-red focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
                 >
                   {(Object.keys(SORT_LABELS) as SortOption[]).map((option) => (
                     <option key={option} value={option}>
@@ -170,21 +172,28 @@ function BrowseMenuContent() {
                   {Array.from({ length: 6 }).map((_, index) => (
                     <div
                       key={index}
-                      className="h-80 animate-pulse rounded-[1.5rem] bg-brand-brown/10"
+                      className="h-80 animate-pulse rounded-card bg-brand-brown/10"
                     />
                   ))}
                 </div>
               ) : error ? (
-                <div className="rounded-[1.5rem] border border-brand-red/30 bg-white px-6 py-10 text-center">
-                  <p className="text-sm font-semibold text-brand-red">{error}</p>
+                <EmptyState
+                  icon={CircleAlert}
+                  tone="neutral"
+                  dashed={false}
+                  title="We couldn’t load the menu"
+                  description={error}
+                >
                   <button
                     type="button"
-                    onClick={() => updateQuery({ page })}
-                    className="mt-4 rounded-full bg-brand-red px-5 py-2 text-sm font-bold text-white"
+                    onClick={() => setReloadKey((key) => key + 1)}
+                    className={cn(
+                      buttonVariants({ variant: "brand", size: "cta-md" }),
+                    )}
                   >
                     Try again
                   </button>
-                </div>
+                </EmptyState>
               ) : (
                 <MenuGrid items={data?.items ?? []} />
               )}
@@ -196,7 +205,9 @@ function BrowseMenuContent() {
                   type="button"
                   disabled={page <= 1}
                   onClick={() => updateQuery({ page: page - 1 })}
-                  className="inline-flex items-center gap-2 rounded-full border border-brand-brown/20 bg-white px-4 py-2 text-sm font-semibold text-brand-brown transition-colors hover:border-brand-red hover:text-brand-red disabled:cursor-not-allowed disabled:opacity-40"
+                  className={cn(
+                    buttonVariants({ variant: "brandOutline", size: "cta-md" }),
+                  )}
                 >
                   <ArrowLeft aria-hidden="true" className="size-4" />
                   Previous
@@ -208,7 +219,9 @@ function BrowseMenuContent() {
                   type="button"
                   disabled={page >= data.totalPages}
                   onClick={() => updateQuery({ page: page + 1 })}
-                  className="inline-flex items-center gap-2 rounded-full border border-brand-brown/20 bg-white px-4 py-2 text-sm font-semibold text-brand-brown transition-colors hover:border-brand-red hover:text-brand-red disabled:cursor-not-allowed disabled:opacity-40"
+                  className={cn(
+                    buttonVariants({ variant: "brandOutline", size: "cta-md" }),
+                  )}
                 >
                   Next
                   <ArrowRight aria-hidden="true" className="size-4" />

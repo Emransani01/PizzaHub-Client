@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Store, UserRound } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants";
 import { errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -174,16 +175,18 @@ export function ChooseRoleForm() {
         </p>
       ) : null}
 
-      <button
+      <Button
         type="submit"
+        variant="brand"
+        size="cta-md"
         disabled={submitting}
-        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-red px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-red-dark disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-5 w-full"
       >
         {submitting ? (
           <Loader2 aria-hidden="true" className="size-4 animate-spin" />
         ) : null}
         {submitting ? "Saving…" : "Continue to my dashboard"}
-      </button>
+      </Button>
     </form>
   );
 }

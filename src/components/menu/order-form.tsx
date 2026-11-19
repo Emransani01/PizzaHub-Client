@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Loader2, Lock, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants";
 import { errorMessage } from "@/lib/api";
 import { todayIso } from "@/lib/utils";
@@ -42,7 +43,7 @@ export function OrderForm({ item }: { item: MenuItem }) {
           vendor.
         </p>
         <Link
-          href={`${ROUTES.signIn}?next=${encodeURIComponent(ROUTES.menuItem(item.id))}`}
+          href={`${ROUTES.signIn}?next=${encodeURIComponent(ROUTES.menuOrder(item.id))}`}
           className="mt-5 inline-flex items-center gap-2 rounded-full bg-brand-red px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-brand-red-dark"
         >
           Sign in to continue
@@ -198,10 +199,12 @@ export function OrderForm({ item }: { item: MenuItem }) {
         </p>
       ) : null}
 
-      <button
+      <Button
         type="submit"
+        variant="brand"
+        size="cta-md"
         disabled={submitting}
-        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-red px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-red-dark disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-5 w-full"
       >
         {submitting ? (
           <Loader2 aria-hidden="true" className="size-4 animate-spin" />
@@ -209,7 +212,7 @@ export function OrderForm({ item }: { item: MenuItem }) {
           <ShoppingBag aria-hidden="true" className="size-4" />
         )}
         {submitting ? "Sending order..." : "Send order request"}
-      </button>
+      </Button>
     </form>
   );
 }

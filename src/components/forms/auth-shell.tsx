@@ -11,7 +11,10 @@ export function AuthShell({ children }: AuthShellProps) {
   return (
     <div className="flex min-h-screen flex-col bg-cream">
       <Navbar />
-      <main className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6 sm:py-14">
+      <main
+        id="main-content"
+        className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6 sm:py-14"
+      >
         <div className="grid w-full max-w-5xl items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
           <section className="relative hidden overflow-hidden rounded-[2rem] bg-brand-brown p-10 lg:block">
             <Image

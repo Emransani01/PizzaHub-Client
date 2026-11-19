@@ -7,15 +7,18 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* PizzaHub brand palette */
+  /* PizzaHub brand palette — semantic tokens (defined in :root / .dark).
+     `cream` stays fixed because it is used as text on dark brand surfaces. */
   --color-cream: #fff8ee;
   --color-cream-deep: #f8eeda;
-  --color-brand-red: #c1121f;
-  --color-brand-red-dark: #8e0e17;
+  --color-brand-red: var(--pz-red);
+  --color-brand-red-dark: var(--pz-red-dark);
   --color-brand-orange: #f77f00;
   --color-brand-gold: #f6b93b;
-  --color-brand-brown: #2b1a12;
+  --color-brand-brown: var(--pz-ink);
   --color-brand-brown-light: #4a2e1e;
+  --color-brand-brown-deep: #2b1a12;
+  --color-surface: var(--pz-surface);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
@@ -55,17 +58,35 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* Canonical PizzaHub surface radii and shadows. Reuse these instead of
+     repeating arbitrary values across cards, panels and empty states. */
+  --radius-panel: 1.25rem;
+  --radius-card: 1.5rem;
+  --radius-card-lg: 1.75rem;
+  --shadow-card: 0 16px 40px -34px var(--pz-shadow-ink);
+  --shadow-card-hover: 0 24px 44px -26px var(--pz-shadow-ink);
 }
 
 :root {
+  /* PizzaHub semantic palette. Light values are the approved cream/brown/red
+     identity; .dark supplies a coordinated warm-dark version. */
+  --pz-ink: #2b1a12;
+  --pz-red: #c1121f;
+  --pz-red-dark: #8e0e17;
+  --pz-canvas: #fff8ee;
+  --pz-canvas-deep: #f8eeda;
+  --pz-surface: #ffffff;
+  --pz-brown-deep: #2b1a12;
+  --pz-shadow-ink: rgba(43, 26, 18, 0.5);
+
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: var(--pz-red);
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -75,7 +96,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: var(--pz-red);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -93,37 +114,47 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* Coordinated warm-dark brand palette. */
+  --pz-ink: #f5e8d6;
+  --pz-red: #f0525e;
+  --pz-red-dark: #d93a46;
+  --pz-canvas: #14100d;
+  --pz-canvas-deep: #1e1813;
+  --pz-surface: #221b16;
+  --pz-brown-deep: #1a110c;
+  --pz-shadow-ink: rgba(0, 0, 0, 0.55);
+
+  --background: var(--pz-canvas);
+  --foreground: var(--pz-ink);
+  --card: var(--pz-surface);
+  --card-foreground: var(--pz-ink);
+  --popover: var(--pz-surface);
+  --popover-foreground: var(--pz-ink);
+  --primary: var(--pz-red);
+  --primary-foreground: #ffffff;
+  --secondary: #2d241d;
+  --secondary-foreground: var(--pz-ink);
+  --muted: #2d241d;
+  --muted-foreground: #bda992;
+  --accent: #2d241d;
+  --accent-foreground: var(--pz-ink);
+  --destructive: var(--pz-red);
+  --border: rgba(245, 232, 214, 0.14);
+  --input: rgba(245, 232, 214, 0.16);
+  --ring: var(--pz-red);
+  --chart-1: #f6b93b;
+  --chart-2: #f77f00;
+  --chart-3: #f0525e;
+  --chart-4: #d9a15b;
+  --chart-5: #8b6f57;
+  --sidebar: var(--pz-surface);
+  --sidebar-foreground: var(--pz-ink);
+  --sidebar-primary: var(--pz-red);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #2d241d;
+  --sidebar-accent-foreground: var(--pz-ink);
+  --sidebar-border: rgba(245, 232, 214, 0.14);
+  --sidebar-ring: var(--pz-red);
 }
 
 @layer base {
@@ -168,6 +199,10 @@
   .text-shadow-hero {
     text-shadow: 0 2px 24px rgba(20, 10, 4, 0.35);
   }
+  /* One page-heading style shared by public pages and dashboard headers. */
+  .page-title {
+    @apply font-heading text-3xl font-extrabold tracking-tight text-brand-brown sm:text-4xl;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -178,4 +213,73 @@
   .animate-pizzahub-spin-slow {
     animation: none;
   }
+}
+
+/* --------------------------------------------------------------------------
+ * Dark-mode surface corrections.
+ * Existing components use fixed Tailwind surface utilities. These scoped rules
+ * map the solid/translucent *surface* utilities onto the theme tokens. Real
+ * white overlays on dark brand surfaces (bg-white/5, bg-white/15) are left
+ * untouched so hover highlights stay visible. Keeping these here avoids a
+ * risky mass class replacement across every component.
+ * ------------------------------------------------------------------------ */
+.dark .bg-white {
+  background-color: var(--pz-surface);
+}
+.dark .bg-white\/60 {
+  background-color: color-mix(in oklab, var(--pz-surface) 60%, transparent);
+}
+.dark .bg-white\/70 {
+  background-color: color-mix(in oklab, var(--pz-surface) 70%, transparent);
+}
+.dark .bg-white\/90 {
+  background-color: color-mix(in oklab, var(--pz-surface) 90%, transparent);
+}
+
+.dark .bg-cream {
+  background-color: var(--pz-canvas);
+}
+.dark .bg-cream\/30 {
+  background-color: color-mix(in oklab, var(--pz-canvas) 30%, transparent);
+}
+.dark .bg-cream\/40 {
+  background-color: color-mix(in oklab, var(--pz-canvas) 40%, transparent);
+}
+.dark .bg-cream\/50 {
+  background-color: color-mix(in oklab, var(--pz-canvas) 50%, transparent);
+}
+.dark .bg-cream\/70 {
+  background-color: color-mix(in oklab, var(--pz-canvas) 70%, transparent);
+}
+.dark .bg-cream\/80 {
+  background-color: color-mix(in oklab, var(--pz-canvas) 80%, transparent);
+}
+.dark .bg-cream\/95 {
+  background-color: color-mix(in oklab, var(--pz-canvas) 95%, transparent);
+}
+
+.dark .bg-cream-deep {
+  background-color: var(--pz-canvas-deep);
+}
+.dark .bg-cream-deep\/50 {
+  background-color: color-mix(in oklab, var(--pz-canvas-deep) 50%, transparent);
+}
+.dark .bg-cream-deep\/60 {
+  background-color: color-mix(in oklab, var(--pz-canvas-deep) 60%, transparent);
+}
+
+.dark .bg-brand-brown {
+  background-color: var(--pz-brown-deep);
+}
+.dark .bg-brand-brown\/40 {
+  background-color: color-mix(in oklab, var(--pz-brown-deep) 40%, transparent);
+}
+.dark .bg-brand-brown\/80 {
+  background-color: color-mix(in oklab, var(--pz-brown-deep) 80%, transparent);
+}
+
+/* Gold badges must keep dark text in both themes. */
+.dark .bg-brand-gold.text-brand-brown,
+.dark .bg-brand-gold .text-brand-brown {
+  color: var(--pz-brown-deep);
 }

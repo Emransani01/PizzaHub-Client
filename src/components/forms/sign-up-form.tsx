@@ -1,24 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Store, UserRound } from "lucide-react";
+import { Camera, Loader2, Store, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { ROUTES } from "@/constants";
 import { errorMessage, isApiError } from "@/lib/api";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import { getPublicConfig } from "@/services/config";
+import { Button } from "@/components/ui/button";
+import { inputClass, labelClass } from "@/components/ui/form-field";
+import { uploadProfileImage } from "@/services/uploads";
 import { completeRole, updateMyProfile } from "@/services/users";
 import { roleHome, useAuth } from "@/providers/auth-provider";
 import type { UserRole } from "@/types";
-
-const inputClass =
-  "h-11 w-full rounded-xl border border-brand-brown/15 bg-cream/40 px-3.5 text-sm text-brand-brown outline-none transition-colors placeholder:text-brand-brown/35 focus:border-brand-red focus:ring-4 focus:ring-brand-red/10";
-
-const labelClass =
-  "text-xs font-bold uppercase tracking-wide text-brand-brown/50";
 
 type SignUpRole = Extract<UserRole, "customer" | "vendor">;
 
@@ -36,22 +34,65 @@ export function SignUpForm() {
   const [role, setRole] = useState<SignUpRole>(initialRole);
   const [businessName, setBusinessName] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [googleStatus, setGoogleStatus] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
   const [googleEnabled, setGoogleEnabled] = useState(false);
+  const [imgbbEnabled, setImgbbEnabled] = useState(false);
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [profilePreview, setProfilePreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const loadGoogleConfig = useCallback(async () => {
+    setGoogleStatus("loading");
+    try {
+      const config = await getPublicConfig();
+      setGoogleEnabled(config.googleEnabled);
+      setImgbbEnabled(config.imgbbEnabled);
+      setGoogleStatus("ready");
+    } catch {
+      setGoogleStatus("error");
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    getPublicConfig()
-      .then((config) => {
-        if (!cancelled) setGoogleEnabled(config.googleEnabled);
-      })
-      .catch(() => {
-        if (!cancelled) setGoogleEnabled(false);
-      });
+    void loadGoogleConfig();
+  }, [loadGoogleConfig]);
+
+  useEffect(() => {
     return () => {
-      cancelled = true;
+      if (profilePreview) URL.revokeObjectURL(profilePreview);
     };
-  }, []);
+  }, [profilePreview]);
+
+  function onProfileImageChange(file: File | null) {
+    setError(null);
+    if (profilePreview) URL.revokeObjectURL(profilePreview);
+
+    if (!file) {
+      setProfileImageFile(null);
+      setProfilePreview(null);
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file (PNG, JPEG or WebP).");
+      setProfileImageFile(null);
+      setProfilePreview(null);
+      return;
+    }
+
+    if (file.size > 4 * 1024 * 1024) {
+      setError("Profile images must be 4 MB or smaller.");
+      setProfileImageFile(null);
+      setProfilePreview(null);
+      return;
+    }
+
+    setProfileImageFile(file);
+    setProfilePreview(URL.createObjectURL(file));
+  }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -110,6 +151,17 @@ export function SignUpForm() {
           await updateMyProfile({ businessName: businessName.trim() });
         } catch {
           // The business name can be added later from profile settings.
+        }
+      }
+
+      if (profileImageFile && imgbbEnabled) {
+        try {
+          const uploaded = await uploadProfileImage(profileImageFile);
+          await updateMyProfile({ image: uploaded.displayUrl || uploaded.url });
+        } catch {
+          toast.error(
+            "Account created, but the profile photo could not be uploaded. You can add it later in Profile Settings.",
+          );
         }
       }
 
@@ -283,6 +335,68 @@ export function SignUpForm() {
         </div>
 
         <div className="space-y-1.5">
+          <span className={labelClass}>Profile photo (optional)</span>
+          <div className="flex items-center gap-3 rounded-xl border border-brand-brown/15 bg-cream/30 p-3">
+            <div className="relative size-14 shrink-0 overflow-hidden rounded-full bg-brand-brown/10">
+              {profilePreview ? (
+                <Image
+                  src={profilePreview}
+                  alt="Selected profile photo preview"
+                  fill
+                  sizes="56px"
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : (
+                <span className="flex h-full items-center justify-center text-brand-brown/40">
+                  <Camera aria-hidden="true" className="size-5" />
+                </span>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={!imgbbEnabled || submitting}
+                  className="rounded-full border border-brand-brown/20 bg-white px-3 py-1.5 text-xs font-bold text-brand-brown transition-colors hover:border-brand-red hover:text-brand-red disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {profileImageFile ? "Change photo" : "Upload photo"}
+                </button>
+                {profileImageFile ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onProfileImageChange(null);
+                      if (fileRef.current) fileRef.current.value = "";
+                    }}
+                    className="inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold text-brand-brown/60 hover:text-brand-red"
+                  >
+                    <X aria-hidden="true" className="size-3.5" />
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+              <p className="mt-1 text-xs leading-5 text-brand-brown/45">
+                {imgbbEnabled
+                  ? "Optional. PNG, JPEG or WebP up to 4 MB. You can add or change it later in Profile Settings."
+                  : "Photo upload is unavailable until ImgBB is configured. You can add one later in Profile Settings."}
+              </p>
+            </div>
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              onProfileImageChange(file);
+            }}
+          />
+        </div>
+
+        <div className="space-y-1.5">
           <label htmlFor="sign-up-password" className={labelClass}>
             Password
           </label>
@@ -310,18 +424,38 @@ export function SignUpForm() {
         </p>
       ) : null}
 
-      <button
+      <Button
         type="submit"
+        variant="brand"
+        size="cta-md"
         disabled={submitting}
-        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-red px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-red-dark disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-5 w-full"
       >
         {submitting ? (
           <Loader2 aria-hidden="true" className="size-4 animate-spin" />
         ) : null}
         {submitting ? "Creating your account…" : "Create account"}
-      </button>
+      </Button>
 
-      {googleEnabled ? (
+      {googleStatus === "error" ? (
+        <>
+          <div className="my-5 flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-brand-brown/30">
+            <span className="h-px flex-1 bg-brand-brown/10" />
+            or
+            <span className="h-px flex-1 bg-brand-brown/10" />
+          </div>
+          <div className="rounded-xl border border-brand-brown/10 bg-cream/40 px-4 py-3 text-center text-sm text-brand-brown/60">
+            Google sign-in is temporarily unavailable.{" "}
+            <button
+              type="button"
+              onClick={() => void loadGoogleConfig()}
+              className="font-bold text-brand-red hover:underline"
+            >
+              Retry
+            </button>
+          </div>
+        </>
+      ) : googleStatus === "ready" && googleEnabled ? (
         <>
           <div className="my-5 flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-brand-brown/30">
             <span className="h-px flex-1 bg-brand-brown/10" />

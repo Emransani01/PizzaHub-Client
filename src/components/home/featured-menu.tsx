@@ -1,8 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, Crown, MapPin, Store } from "lucide-react";
+import { ArrowUpRight, Crown, MapPin, Store, UtensilsCrossed } from "lucide-react";
+import { OrderButton } from "@/components/menu/order-button";
+import { EmptyState } from "@/components/shared/empty-state";
+import { buttonVariants } from "@/components/ui/button";
 import { FALLBACK_FOOD_IMAGE, ROUTES } from "@/constants";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { fetchFeaturedItems } from "@/lib/server-api";
 
 export async function FeaturedMenu() {
@@ -45,27 +48,25 @@ export async function FeaturedMenu() {
         </div>
 
         {items.length === 0 ? (
-          <div className="mt-10 rounded-[1.75rem] border border-dashed border-brand-brown/20 bg-cream px-6 py-14 text-center">
-            <p className="text-lg font-bold text-brand-brown">
-              No approved dishes yet
-            </p>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-brand-brown/60">
-              Vendors are still stocking their kitchens. Once an administrator
-              approves a menu item it will appear here automatically.
-            </p>
+          <EmptyState
+            icon={UtensilsCrossed}
+            title="No approved dishes yet"
+            description="Vendors are still stocking their kitchens. Once an administrator approves a menu item it will appear here automatically."
+            className="mt-10"
+          >
             <Link
               href={ROUTES.browseMenu}
-              className="mt-6 inline-flex items-center gap-2 rounded-full bg-brand-red px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-red-dark"
+              className={cn(buttonVariants({ variant: "brand", size: "cta-md" }))}
             >
               Visit the menu
             </Link>
-          </div>
+          </EmptyState>
         ) : (
           <div className="mt-10 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
             {items.slice(0, 8).map((item) => (
               <article
                 key={item.id}
-                className="group flex flex-col overflow-hidden rounded-[1.75rem] border border-brand-brown/10 bg-white shadow-[0_16px_40px_-30px_rgba(43,26,18,0.55)] transition-all duration-300 hover:-translate-y-1.5 hover:border-brand-red/20 hover:shadow-[0_26px_50px_-26px_rgba(43,26,18,0.5)]"
+                className="group flex flex-col overflow-hidden rounded-card-lg border border-brand-brown/10 bg-card shadow-card transition-all duration-300 hover:-translate-y-1.5 hover:border-brand-red/20 hover:shadow-card-hover"
               >
                 <Link
                   href={ROUTES.menuItem(item.id)}
@@ -102,7 +103,7 @@ export async function FeaturedMenu() {
                     {item.description}
                   </p>
 
-                  <div className="mt-auto flex items-end justify-between gap-3 pt-6">
+                  <div className="mt-auto flex flex-wrap items-end justify-between gap-3 pt-6">
                     <div>
                       <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-brand-brown/40">
                         <MapPin aria-hidden="true" className="size-3" />
@@ -112,13 +113,16 @@ export async function FeaturedMenu() {
                         {formatCurrency(item.price)}
                       </p>
                     </div>
-                    <Link
-                      href={ROUTES.menuItem(item.id)}
-                      aria-label={`View ${item.itemName}`}
-                      className="inline-flex size-10 items-center justify-center rounded-full bg-brand-red text-white transition-all hover:-translate-y-0.5 hover:bg-brand-red-dark"
-                    >
-                      <ArrowUpRight aria-hidden="true" className="size-4" />
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <OrderButton item={item} className="whitespace-nowrap px-3" />
+                      <Link
+                        href={ROUTES.menuItem(item.id)}
+                        aria-label={`View ${item.itemName}`}
+                        className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-red text-white transition-all hover:-translate-y-0.5 hover:bg-brand-red-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
+                      >
+                        <ArrowUpRight aria-hidden="true" className="size-4" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </article>

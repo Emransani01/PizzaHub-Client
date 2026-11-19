@@ -2,8 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, Loader2, Plus } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowRight,
+  CircleCheck,
+  CirclePlus,
+  Clock3,
+  Loader2,
+  Plus,
+  ShoppingBag,
+} from "lucide-react";
 import { DashboardChart } from "@/components/dashboard/dashboard-chart";
+import { DashboardPanel } from "@/components/dashboard/dashboard-panel";
 import { OrderStatusBadge } from "@/components/dashboard/status-badge";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { PageHeader } from "@/components/shared/page-header";
@@ -41,12 +51,13 @@ export default function VendorDashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        eyebrow="Vendor dashboard"
         title="Kitchen overview"
         description="Track your menu, approvals and incoming orders."
       >
         <Link
           href={ROUTES.vendorAddMenuItem}
-          className="inline-flex items-center gap-2 rounded-full bg-brand-red px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-red-dark"
+          className="inline-flex items-center gap-2 rounded-full bg-brand-red px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-red-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
         >
           <Plus aria-hidden="true" className="size-4" />
           Add menu item
@@ -103,49 +114,55 @@ export default function VendorDashboardPage() {
               label="Live menu items"
               value={`${stats.activeItems}${stats.premiumActive ? "" : ` / ${stats.activeItemLimit}`}`}
               hint={`${stats.approvedItems} approved in total`}
+              icon={CirclePlus}
+              accent="red"
             />
             <StatsCard
               label="Awaiting review"
               value={stats.pendingItems}
               hint="Items waiting for admin approval"
+              icon={Clock3}
+              accent="gold"
             />
             <StatsCard
               label="Orders received"
               value={stats.totalOrders}
               hint={`${stats.orders.pending} pending a decision`}
+              icon={ShoppingBag}
+              accent="brown"
             />
             <StatsCard
               label="Accepted orders"
               value={stats.orders.accepted}
               hint={`${stats.orders.rejected} rejected`}
+              icon={CircleCheck}
+              accent="green"
             />
           </div>
 
           <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
             <DashboardChart series={data?.series ?? []} />
 
-            <div className="rounded-[1.25rem] border border-brand-brown/10 bg-white p-5">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm font-extrabold uppercase tracking-wide text-brand-brown/60">
-                  Latest orders
-                </h2>
+            <DashboardPanel
+              title="Latest orders"
+              action={
                 <Link
                   href={ROUTES.vendorCustomerOrders}
                   className="text-xs font-bold text-brand-red hover:underline"
                 >
                   View all
                 </Link>
-              </div>
-
+              }
+            >
               {data?.recentOrders.length === 0 ? (
-                <p className="mt-4 text-sm text-brand-brown/50">
+                <p className="text-sm text-brand-brown/50">
                   No orders yet. Once a customer orders one of your dishes it will
                   appear here.
                 </p>
               ) : (
-                <ul className="mt-4 divide-y divide-brand-brown/10">
+                <ul className="divide-y divide-brand-brown/10">
                   {data?.recentOrders.map((order) => (
-                    <li key={order.id} className="flex items-start justify-between gap-3 py-3">
+                    <li key={order.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold text-brand-brown">
                           {order.itemName}
@@ -164,7 +181,7 @@ export default function VendorDashboardPage() {
                   ))}
                 </ul>
               )}
-            </div>
+            </DashboardPanel>
           </div>
         </>
       ) : null}

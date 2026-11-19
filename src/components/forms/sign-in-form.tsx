@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, LogIn, Mail } from "lucide-react";
+import { Eye, EyeOff, Loader2, LogIn, Mail } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { inputClass } from "@/components/ui/form-field";
 import { ROUTES } from "@/constants";
 import { authClient } from "@/lib/auth-client";
+import { safeNextPath } from "@/lib/navigation";
+import { cn } from "@/lib/utils";
 import { getPublicConfig } from "@/services/config";
 import { roleHome, useAuth } from "@/providers/auth-provider";
-
-const inputClass =
-  "h-11 w-full rounded-xl border border-brand-brown/15 bg-cream/40 px-3.5 text-sm text-brand-brown outline-none transition-colors placeholder:text-brand-brown/35 focus:border-brand-red focus:ring-4 focus:ring-brand-red/10";
 
 export function SignInForm() {
   const router = useRouter();
@@ -22,23 +23,28 @@ export function SignInForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [googleStatus, setGoogleStatus] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
   const [googleEnabled, setGoogleEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    getPublicConfig()
-      .then((config) => {
-        if (!cancelled) setGoogleEnabled(config.googleEnabled);
-      })
-      .catch(() => {
-        if (!cancelled) setGoogleEnabled(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+  const loadGoogleConfig = useCallback(async () => {
+    setGoogleStatus("loading");
+    try {
+      const config = await getPublicConfig();
+      setGoogleEnabled(config.googleEnabled);
+      setGoogleStatus("ready");
+    } catch {
+      setGoogleStatus("error");
+    }
   }, []);
+
+  useEffect(() => {
+    void loadGoogleConfig();
+  }, [loadGoogleConfig]);
 
   async function finishSignIn() {
     const user = await refresh();
@@ -62,7 +68,9 @@ export function SignInForm() {
       return;
     }
 
-    router.replace(nextParam && nextParam.startsWith("/") ? nextParam : roleHome(user.role));
+    const fallback =
+      user.role === "customer" ? ROUTES.home : roleHome(user.role);
+    router.replace(safeNextPath(nextParam, fallback));
   }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -100,7 +108,7 @@ export function SignInForm() {
 
   async function onGoogle() {
     setError(null);
-    const callbackURL = nextParam && nextParam.startsWith("/") ? nextParam : "/";
+    const callbackURL = safeNextPath(nextParam, "/");
     const result = await authClient.signIn.social({
       provider: "google",
       callbackURL,
@@ -158,17 +166,33 @@ export function SignInForm() {
           >
             Password
           </label>
-          <input
-            id="sign-in-password"
-            name="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="Enter your password"
-            className={inputClass}
-          />
+          <div className="relative">
+            <input
+              id="sign-in-password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Enter your password"
+              className={cn(inputClass, "pr-12")}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+              aria-controls="sign-in-password"
+              className="absolute right-2 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-brand-brown/45 transition-colors hover:text-brand-brown focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
+            >
+              {showPassword ? (
+                <EyeOff aria-hidden="true" className="size-4" />
+              ) : (
+                <Eye aria-hidden="true" className="size-4" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -181,10 +205,12 @@ export function SignInForm() {
         </p>
       ) : null}
 
-      <button
+      <Button
         type="submit"
+        variant="brand"
+        size="cta-md"
         disabled={submitting}
-        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-red px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-red-dark disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-5 w-full"
       >
         {submitting ? (
           <Loader2 aria-hidden="true" className="size-4 animate-spin" />
@@ -192,9 +218,27 @@ export function SignInForm() {
           <LogIn aria-hidden="true" className="size-4" />
         )}
         {submitting ? "Signing in…" : "Sign in"}
-      </button>
+      </Button>
 
-      {googleEnabled ? (
+      {googleStatus === "error" ? (
+        <>
+          <div className="my-5 flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-brand-brown/30">
+            <span className="h-px flex-1 bg-brand-brown/10" />
+            or
+            <span className="h-px flex-1 bg-brand-brown/10" />
+          </div>
+          <div className="rounded-xl border border-brand-brown/10 bg-cream/40 px-4 py-3 text-center text-sm text-brand-brown/60">
+            Google sign-in is temporarily unavailable.{" "}
+            <button
+              type="button"
+              onClick={() => void loadGoogleConfig()}
+              className="font-bold text-brand-red hover:underline"
+            >
+              Retry
+            </button>
+          </div>
+        </>
+      ) : googleStatus === "ready" && googleEnabled ? (
         <>
           <div className="my-5 flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-brand-brown/30">
             <span className="h-px flex-1 bg-brand-brown/10" />

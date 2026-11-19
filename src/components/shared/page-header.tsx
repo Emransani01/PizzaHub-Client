@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 
 interface PageHeaderProps {
   title: string;
+  eyebrow?: string;
   description?: string;
   children?: ReactNode;
   className?: string;
@@ -10,6 +11,7 @@ interface PageHeaderProps {
 
 export function PageHeader({
   title,
+  eyebrow,
   description,
   children,
   className,
@@ -22,7 +24,12 @@ export function PageHeader({
       )}
     >
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+        {eyebrow ? (
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-red">
+            {eyebrow}
+          </p>
+        ) : null}
+        <h1 className="text-2xl font-extrabold tracking-tight text-brand-brown sm:text-3xl">
           {title}
         </h1>
         {description ? (

@@ -6,18 +6,21 @@ import { usePathname } from "next/navigation";
 import {
   ArrowRight,
   ChevronDown,
-  Heart,
   LayoutDashboard,
   LogOut,
   Menu,
   Settings,
+  ShoppingCart,
   UserRound,
   X,
 } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 import { ROUTES, ROLE_LABELS } from "@/constants";
 import { cn } from "@/lib/utils";
 import { roleHome, useAuth } from "@/providers/auth-provider";
 import { Logo } from "./logo";
+import { ThemeToggle } from "./theme-toggle";
+import { UserAvatar } from "./user-avatar";
 
 const navLinks = [
   { href: ROUTES.home, label: "Home" },
@@ -26,7 +29,7 @@ const navLinks = [
 
 export function Navbar() {
   const pathname = usePathname();
-  const { user, loading, favoriteIds, signOut } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -63,6 +66,12 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-brand-brown/10 bg-cream/95 backdrop-blur-md">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-[60] focus:rounded-full focus:bg-brand-red focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-white"
+      >
+        Skip to content
+      </a>
       <div className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Logo />
 
@@ -91,7 +100,10 @@ export function Navbar() {
           {user ? (
             <Link
               href={dashboardHref}
-              className="hidden items-center gap-2 rounded-full bg-brand-red px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_20px_-8px_rgba(193,18,31,0.9)] transition-all hover:-translate-y-0.5 hover:bg-brand-red-dark hover:shadow-[0_12px_24px_-8px_rgba(193,18,31,0.9)] sm:inline-flex"
+              className={cn(
+                buttonVariants({ variant: "brand", size: "cta-md" }),
+                "hidden sm:inline-flex",
+              )}
             >
               <LayoutDashboard aria-hidden="true" className="size-4" />
               Dashboard
@@ -99,21 +111,14 @@ export function Navbar() {
           ) : null}
 
           <Link
-            href={ROUTES.favorites}
-            aria-label={
-              user
-                ? `Saved favourites (${favoriteIds.length})`
-                : "Saved favourites — sign in to view"
-            }
+            href={ROUTES.cart}
+            aria-label="Cart"
             className="group relative ml-0.5 inline-flex size-10 items-center justify-center rounded-full text-brand-brown transition-colors hover:bg-brand-red/10 hover:text-brand-red"
           >
-            <Heart aria-hidden="true" className="size-5" />
-            {user && favoriteIds.length > 0 ? (
-              <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-brand-gold text-[10px] font-bold text-brand-brown">
-                {favoriteIds.length}
-              </span>
-            ) : null}
+            <ShoppingCart aria-hidden="true" className="size-5" />
           </Link>
+
+          <ThemeToggle />
 
           {loading ? (
             <span
@@ -129,9 +134,11 @@ export function Navbar() {
                 aria-haspopup="menu"
                 className="inline-flex items-center gap-2 rounded-full border border-brand-brown/15 bg-white/70 py-1.5 pl-1.5 pr-3 text-sm font-semibold text-brand-brown transition-colors hover:border-brand-red/30 hover:text-brand-red"
               >
-                <span className="flex size-7 items-center justify-center rounded-full bg-brand-red text-xs font-bold text-white">
-                  {user.name.slice(0, 1).toUpperCase()}
-                </span>
+                <UserAvatar
+                  name={user.name}
+                  image={user.image}
+                  className="size-7 text-xs"
+                />
                 <span className="max-w-28 truncate">{user.name}</span>
                 <ChevronDown
                   aria-hidden="true"
@@ -251,12 +258,29 @@ export function Navbar() {
             ))}
             <div className="my-3 h-px bg-brand-brown/10" />
 
+            <Link
+              href={ROUTES.cart}
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 rounded-2xl px-4 py-3 text-base font-semibold text-brand-brown transition-colors hover:bg-brand-red/5"
+            >
+              <ShoppingCart aria-hidden="true" className="size-4" />
+              Cart
+            </Link>
+            <div className="flex items-center justify-between rounded-2xl px-4 py-1.5 md:hidden">
+              <span className="text-base font-semibold text-brand-brown">
+                Appearance
+              </span>
+              <ThemeToggle />
+            </div>
+
             {user ? (
               <>
                 <div className="mb-2 flex items-center gap-3 rounded-2xl bg-white/60 px-4 py-3">
-                  <span className="flex size-9 items-center justify-center rounded-full bg-brand-red text-sm font-bold text-white">
-                    {user.name.slice(0, 1).toUpperCase()}
-                  </span>
+                  <UserAvatar
+                    name={user.name}
+                    image={user.image}
+                    className="size-9 text-sm"
+                  />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold text-brand-brown">
                       {user.name}
@@ -269,18 +293,10 @@ export function Navbar() {
                 <Link
                   href={dashboardHref}
                   onClick={() => setOpen(false)}
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-red px-5 py-3 text-sm font-bold text-white"
+                  className={cn(buttonVariants({ variant: "brand", size: "cta-md" }))}
                 >
                   <LayoutDashboard aria-hidden="true" className="size-4" />
                   Dashboard
-                </Link>
-                <Link
-                  href={ROUTES.favorites}
-                  onClick={() => setOpen(false)}
-                  className="flex items-center gap-2 rounded-2xl px-4 py-3 text-base font-semibold text-brand-brown transition-colors hover:bg-brand-red/5"
-                >
-                  <Heart aria-hidden="true" className="size-4" />
-                  Favourites
                 </Link>
                 <Link
                   href={ROUTES.profileSettings}

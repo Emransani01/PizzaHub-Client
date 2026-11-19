@@ -8,6 +8,12 @@ category cards, animations and footer) is the approved design from earlier
 iterations. This build keeps that design and wires every page to the real API —
 there is no demo or placeholder data left in the UI.
 
+## Links
+
+- Live website URL: **TO BE FILLED AFTER DEPLOYMENT**
+- Client GitHub repository URL: **TO BE FILLED AFTER PUBLISHING (separate client repo)**
+- Server GitHub repository URL: <https://github.com/Emransani01/PizzaHub-Server>
+
 ## Tech stack
 
 | Layer | Choice |
@@ -68,21 +74,30 @@ For deployment, point `API_URL` at the public API origin (for example
 | `npm run lint` | ESLint with the Next.js core-web-vitals + TypeScript configs. |
 | `npx tsc --noEmit` | Standalone type check. |
 
-## Authentication flow
+## Authentication flow and JWT verification middleware
 
 1. Sign-up and sign-in go through Better Auth (`authClient.signIn.email`,
-   `authClient.signUp.email`). New accounts are always created as customers.
-2. After sign-up the user chooses **customer** or **vendor** on `/choose-role`
-   (or during sign-up). The role is written once through
-   `POST /api/users/me/role`. `admin` can never be selected in the UI and the
-   API rejects it.
+   `authClient.signUp.email`). New accounts are never created as admins.
+   Sign-up supports choosing **customer** or **vendor** (with business name for
+   vendors) and an **optional profile image upload** via ImgBB when configured
+   (skippable; can be added later in Profile Settings).
+2. The role is written once through `POST /api/users/me/role` (accepts only
+   `customer` or `vendor`). `admin` can never be selected in the UI and the API
+   rejects it.
 3. `AuthProvider` calls `GET /api/auth/token`, which exchanges the HttpOnly
-   session cookie for a **15-minute JWT kept in a module variable** — never in
-   `localStorage` or a readable cookie.
+   Better Auth session cookie for a **short-lived HS256 JWT kept in a module
+   variable** — never in `localStorage` or a readable cookie.
 4. `apiFetch` attaches `Authorization: Bearer <token>`. On `401` it asks for a
    fresh token once and retries the request.
-5. Signing out clears the token and the session cookie. Blocked accounts get an
-   explanatory error instead of a session.
+5. **Server-side verification (authoritative):** the API's `authenticate`
+   middleware verifies JWT signature/issuer/audience/expiration, reloads the user
+   from MongoDB, and rejects invalid/expired tokens with `401`. `checkBlockedUser`
+   blocks protected operations for blocked accounts (`403`), `authorizeRole(...)`
+   enforces role access (`403`), and services enforce ownership/state transitions
+   (never trusting client-supplied user ID/role). Item details are publicly
+   viewable, but ordering and protected actions require sign-in and server-side
+   authorization.
+6. Signing out clears the in-memory token and the session cookie.
 
 `src/proxy.ts` performs a cookie-presence check for nicer navigation. It is a UX
 shortcut only; every real permission check happens in the Express API.
@@ -120,10 +135,21 @@ never the security boundary.
 | `/dashboard/vendor/subscription` | Free vs Premium, Stripe checkout, payment history |
 | `/dashboard/admin` | Platform overview |
 | `/dashboard/admin/manage-users` | Search/filter accounts, block/unblock |
-| `/dashboard/admin/manage-menu-items` | Approve or reject with a reason |
+| `/dashboard/admin/manage-menu-items` | Approve/reject, change status, delete inappropriate items |
 | `/dashboard/admin/transactions` | Read-only Stripe records |
 | `/payment-success` | Polls the checkout status; never grants Premium itself |
 | `/payment-cancel` | Explains that no payment was taken |
+
+## Advanced search and sorting implementation
+
+Browse Menu combines multiple server-side controls against `GET /api/menu-items`:
+
+- **Search:** text query matched server-side (case-insensitively) across item name,
+  description, category, and location.
+- **Filters:** category (six fixed categories) and location.
+- **Sorting:** newest (default), price ascending, price descending.
+- **Pagination and states:** paged results with explicit loading, empty, and error
+  states. Public listings show only admin-approved and available items.
 
 ## Business rules reflected in the UI
 
@@ -134,9 +160,13 @@ never the security boundary.
   Pending and rejected items do not count.
 - **Premium** is activated only by the verified Stripe webhook. `/payment-success`
   polls `GET /api/subscriptions/checkout/:sessionId` and reports the transaction
-  status; it never upgrades the account.
+  status; it never upgrades the account. Expired/failed/cancelled checkout states
+  are surfaced without granting Premium.
 - **Approval lifecycle:** new and content-edited items are `pending` until an
   admin approves them. Rejections carry an optional reason shown to the vendor.
+  Admins can delete inappropriate items (blocked when an item has order history).
+- **Menu images:** add/edit menu items require uploading 1–3 image files through
+  ImgBB (no pasted URL option); sign-up supports an optional profile image upload.
 - **Order timeline:** every accepted/rejected/cancelled transition is listed with
   its actor role, timestamp and note.
 - **Favourites** are stored per account, not per browser.
@@ -166,6 +196,27 @@ once they are ready.
 synchronous `setLoading(true)` / `setError(null)` at the start of such effects.
 All other hooks rules stay enabled.
 
+## Testing instructions
+
+From `client/`:
+
+```bash
+npx tsc --noEmit
+npm run lint
+npm run build
+```
+
+- `npm run build` runs the TypeScript production build and is the authoritative
+  client type/build check.
+- For integration verification, run the API from `../server` (`npm run dev`) with
+  required env vars configured and exercise auth, role-gated dashboards, menu
+  CRUD/uploads (ImgBB), ordering/timelines, and subscription checkout flows in
+  the browser.
+- Stripe checkout testing (Vendor Premium only): use Stripe test mode, complete or
+  cancel checkout, and confirm Premium changes only after verified webhook events
+  (`/payment-success` only reports status). Google/ImgBB flows require their
+  respective credentials and enabled configuration.
+
 ## Deployment notes
 
 - Deploy the API first, then set `API_URL` to its public HTTPS origin and build
@@ -173,11 +224,17 @@ All other hooks rules stay enabled.
 - Set the API's `CLIENT_URL` and `BETTER_AUTH_URL` to the deployed client origin.
 - Configure the Google OAuth redirect URI as
   `<CLIENT_ORIGIN>/api/auth/callback/google`.
-- Point the Stripe webhook at `<API_URL>/api/subscriptions/webhook`; the success
-  URL should be `<CLIENT_ORIGIN>/payment-success` and the cancel URL
+- Point the Stripe webhook at `<API_URL>/api/subscriptions/webhook` (subscribe to
+  `checkout.session.completed`, `checkout.session.expired`,
+  `checkout.session.async_payment_failed`, `invoice.paid`,
+  `invoice.payment_failed`, `customer.subscription.updated`,
+  `customer.subscription.deleted`); the success URL should be
+  `<CLIENT_ORIGIN>/payment-success` and the cancel URL
   `<CLIENT_ORIGIN>/payment-cancel`.
 - Remote images are allowed from `i.ibb.co`, `ibb.co` and
   `images.unsplash.com` (see `next.config.ts`). Add any new image host there.
+- Ensure direct navigation/refresh works on deployed routes and private-route
+  sessions persist over HTTPS (first-party cookie via same-origin `/api` proxy).
 
 ## Project layout
 

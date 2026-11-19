@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { safeNextPath } from "@/lib/navigation";
 
 const SESSION_COOKIES = [
   "better-auth.session_token",
@@ -6,6 +7,8 @@ const SESSION_COOKIES = [
 ];
 
 const PROTECTED_PREFIXES = ["/dashboard", "/profile-settings", "/favorites"];
+const PROTECTED_EXACT_PATHS = ["/payment-success", "/payment-cancel"];
+const MENU_DETAIL_PREFIX = "/menu/";
 
 /**
  * First line of defence for authenticated pages. The Express API still
@@ -13,11 +16,14 @@ const PROTECTED_PREFIXES = ["/dashboard", "/profile-settings", "/favorites"];
  * redirect is only a UX guard, never the authorisation boundary.
  */
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search, hash } = request.nextUrl;
 
-  const isProtected = PROTECTED_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
+  const isProtected =
+    PROTECTED_PREFIXES.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    ) ||
+    PROTECTED_EXACT_PATHS.includes(pathname) ||
+    pathname.startsWith(MENU_DETAIL_PREFIX);
 
   if (!isProtected) {
     return NextResponse.next();
@@ -30,7 +36,8 @@ export function proxy(request: NextRequest) {
   }
 
   const signIn = new URL("/sign-in", request.url);
-  signIn.searchParams.set("next", pathname);
+  const destination = safeNextPath(`${pathname}${search}${hash}`, "/");
+  signIn.searchParams.set("next", destination);
   return NextResponse.redirect(signIn);
 }
 
@@ -39,5 +46,8 @@ export const config = {
     "/dashboard/:path*",
     "/profile-settings",
     "/favorites",
+    "/menu/:id",
+    "/payment-success",
+    "/payment-cancel",
   ],
 };

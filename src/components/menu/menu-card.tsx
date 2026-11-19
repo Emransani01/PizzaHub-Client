@@ -2,11 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, MapPin, Store } from "lucide-react";
+import { Crown, Heart, MapPin, Store } from "lucide-react";
 import { FALLBACK_FOOD_IMAGE, ROUTES } from "@/constants";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 import type { MenuItem } from "@/types";
+import { OrderButton } from "./order-button";
 
 interface MenuCardProps {
   item: MenuItem;
@@ -18,9 +19,13 @@ export function MenuCard({ item }: MenuCardProps) {
   const canFavorite = user?.role === "customer";
 
   return (
-    <article className="group flex flex-col overflow-hidden rounded-[1.5rem] border border-brand-brown/10 bg-white shadow-[0_16px_40px_-32px_rgba(43,26,18,0.5)] transition-all duration-300 hover:-translate-y-1 hover:border-brand-red/20 hover:shadow-[0_24px_44px_-26px_rgba(43,26,18,0.45)]">
+    <article className="group flex flex-col overflow-hidden rounded-card border border-brand-brown/10 bg-card shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-brand-red/20 hover:shadow-card-hover">
       <div className="relative aspect-[4/3] overflow-hidden bg-cream-deep">
-        <Link href={ROUTES.menuItem(item.id)} aria-label={item.itemName}>
+        <Link
+          href={ROUTES.menuItem(item.id)}
+          aria-label={item.itemName}
+          className="absolute inset-0 block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
+        >
           <Image
             src={item.images[0] ?? FALLBACK_FOOD_IMAGE}
             alt={item.itemName}
@@ -32,6 +37,12 @@ export function MenuCard({ item }: MenuCardProps) {
         <span className="absolute left-3 top-3 rounded-full bg-brand-brown/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-cream backdrop-blur">
           {item.category}
         </span>
+        {item.isPremiumVendor ? (
+          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-brand-gold px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-brown">
+            <Crown aria-hidden="true" className="size-3" />
+            Premium
+          </span>
+        ) : null}
         {canFavorite ? (
           <button
             type="button"
@@ -43,7 +54,7 @@ export function MenuCard({ item }: MenuCardProps) {
                 : `Save ${item.itemName} to favourites`
             }
             className={cn(
-              "absolute right-3 top-3 inline-flex size-9 items-center justify-center rounded-full backdrop-blur transition-colors",
+              "absolute right-3 top-3 inline-flex size-9 items-center justify-center rounded-full backdrop-blur transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red",
               isFavorite
                 ? "bg-brand-red text-white"
                 : "bg-white/90 text-brand-brown hover:bg-brand-red hover:text-white",
@@ -80,6 +91,10 @@ export function MenuCard({ item }: MenuCardProps) {
             <MapPin aria-hidden="true" className="size-3.5" />
             {item.location}
           </span>
+        </div>
+
+        <div className="mt-4">
+          <OrderButton item={item} className="w-full justify-center" />
         </div>
       </div>
     </article>

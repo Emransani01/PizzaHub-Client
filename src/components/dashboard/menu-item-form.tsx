@@ -1,22 +1,27 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ImagePlus, Loader2, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { MENU_CATEGORIES, ROUTES } from "@/constants";
 import { ApiError, errorMessage } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { getPublicConfig } from "@/services/config";
 import { createMenuItem, updateMenuItem } from "@/services/menu";
+import { Button } from "@/components/ui/button";
+import { inputClass, labelClass } from "@/components/ui/form-field";
 import { uploadMenuImage } from "@/services/uploads";
 import type { MenuItem } from "@/types";
 
-const inputClass =
-  "h-11 w-full rounded-xl border border-brand-brown/15 bg-cream/40 px-3.5 text-sm text-brand-brown outline-none transition-colors placeholder:text-brand-brown/35 focus:border-brand-red focus:ring-4 focus:ring-brand-red/10";
-
-const labelClass =
-  "text-xs font-bold uppercase tracking-wide text-brand-brown/50";
+const EMPTY_ADD_FORM = {
+  itemName: "",
+  category: MENU_CATEGORIES[0],
+  description: "",
+  price: "",
+  location: "",
+  isAvailable: true,
+};
 
 interface MenuItemFormProps {
   item?: MenuItem;
@@ -40,15 +45,44 @@ export function MenuItemForm({ item }: MenuItemFormProps) {
   const [price, setPrice] = useState(item ? String(item.price) : "");
   const [location, setLocation] = useState(item?.location ?? "");
   const [images, setImages] = useState<string[]>(item?.images ?? []);
-  const [imageUrl, setImageUrl] = useState("");
   const [isAvailable, setIsAvailable] = useState(item?.isAvailable ?? true);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imgbbEnabled, setImgbbEnabled] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
+  const submitLock = useRef(false);
+
+  function resetAddForm() {
+    setItemName(EMPTY_ADD_FORM.itemName);
+    setCategory(EMPTY_ADD_FORM.category);
+    setDescription(EMPTY_ADD_FORM.description);
+    setPrice(EMPTY_ADD_FORM.price);
+    setLocation(EMPTY_ADD_FORM.location);
+    setImages([]);
+    setIsAvailable(EMPTY_ADD_FORM.isAvailable);
+    setError(null);
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  useEffect(() => {
+    getPublicConfig()
+      .then((config) => setImgbbEnabled(config.imgbbEnabled))
+      .catch(() => setImgbbEnabled(false));
+  }, []);
 
   async function onFiles(files: FileList) {
     setError(null);
+    if (!imgbbEnabled) {
+      const message =
+        "Image uploads are unavailable because ImgBB is not configured on the server.";
+      setError(message);
+      toast.error(message);
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+
     const remaining = 3 - images.length;
     if (remaining <= 0) {
       setError("A menu item can have at most three images.");
@@ -59,15 +93,21 @@ export function MenuItemForm({ item }: MenuItemFormProps) {
     try {
       const uploaded: string[] = [];
       for (const file of Array.from(files).slice(0, remaining)) {
+        if (!file.type.startsWith("image/")) {
+          throw new Error("Only image files can be uploaded.");
+        }
+        if (file.size > 4 * 1024 * 1024) {
+          throw new Error("Each image must be 4 MB or smaller.");
+        }
         const result = await uploadMenuImage(file);
         uploaded.push(result.displayUrl || result.url);
       }
       setImages((current) => [...current, ...uploaded].slice(0, 3));
       toast.success(
-        uploaded.length === 1 ? "Image uploaded." : "Images uploaded.",
+        uploaded.length === 1 ? "Image uploaded to ImgBB." : "Images uploaded to ImgBB.",
       );
     } catch (cause) {
-      const message = detailMessage(cause);
+      const message = cause instanceof Error ? cause.message : detailMessage(cause);
       setError(message);
       toast.error(message);
     } finally {
@@ -76,45 +116,29 @@ export function MenuItemForm({ item }: MenuItemFormProps) {
     }
   }
 
-  function addImageUrl() {
-    const value = imageUrl.trim();
-    if (!value) return;
-    if (!/^https?:\/\//i.test(value)) {
-      setError("Image URLs must start with http:// or https://");
-      return;
-    }
-    if (images.length >= 3) {
-      setError("A menu item can have at most three images.");
-      return;
-    }
-    setImages((current) => [...current, value].slice(0, 3));
-    setImageUrl("");
-    setError(null);
-  }
-
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitLock.current) return;
+    submitLock.current = true;
     setError(null);
 
     const priceValue = Number(price);
+    let validationMessage: string | null = null;
     if (itemName.trim().length < 2) {
-      setError("Give the item a name (at least 2 characters).");
-      return;
+      validationMessage = "Give the item a name (at least 2 characters).";
+    } else if (description.trim().length < 10) {
+      validationMessage = "Write a description of at least 10 characters.";
+    } else if (!Number.isFinite(priceValue) || priceValue <= 0) {
+      validationMessage = "Enter a price greater than zero.";
+    } else if (location.trim().length < 2) {
+      validationMessage = "Enter the kitchen location.";
+    } else if (images.length === 0) {
+      validationMessage = "Upload at least one image file through ImgBB.";
     }
-    if (description.trim().length < 10) {
-      setError("Write a description of at least 10 characters.");
-      return;
-    }
-    if (!Number.isFinite(priceValue) || priceValue <= 0) {
-      setError("Enter a price greater than zero.");
-      return;
-    }
-    if (location.trim().length < 2) {
-      setError("Enter the kitchen location.");
-      return;
-    }
-    if (images.length === 0) {
-      setError("Upload or paste at least one image.");
+
+    if (validationMessage) {
+      setError(validationMessage);
+      submitLock.current = false;
       return;
     }
 
@@ -137,17 +161,19 @@ export function MenuItemForm({ item }: MenuItemFormProps) {
             ? "Item updated and sent back for admin review."
             : "Menu item updated.",
         );
+        router.push(ROUTES.vendorMyMenuItems);
+        router.refresh();
       } else {
         await createMenuItem(payload);
         toast.success("Item submitted for admin approval.");
+        resetAddForm();
       }
-      router.push(ROUTES.vendorMyMenuItems);
-      router.refresh();
     } catch (cause) {
       const message = detailMessage(cause);
       setError(message);
       toast.error(message);
     } finally {
+      submitLock.current = false;
       setSubmitting(false);
     }
   }
@@ -285,7 +311,7 @@ export function MenuItemForm({ item }: MenuItemFormProps) {
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              disabled={uploading}
+              disabled={uploading || !imgbbEnabled}
               className="flex size-24 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-brand-brown/25 bg-cream/50 text-[11px] font-bold uppercase tracking-wide text-brand-brown/45 transition-colors hover:border-brand-red hover:text-brand-red disabled:opacity-50"
             >
               {uploading ? (
@@ -309,24 +335,10 @@ export function MenuItemForm({ item }: MenuItemFormProps) {
           }}
         />
 
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            type="url"
-            value={imageUrl}
-            onChange={(event) => setImageUrl(event.target.value)}
-            placeholder="…or paste an image URL from ImgBB"
-            className={inputClass}
-          />
-          <button
-            type="button"
-            onClick={addImageUrl}
-            className="shrink-0 rounded-xl border border-brand-brown/15 bg-white px-4 py-2.5 text-sm font-bold text-brand-brown transition-colors hover:border-brand-red hover:text-brand-red"
-          >
-            Add URL
-          </button>
-        </div>
         <p className="text-xs text-brand-brown/40">
-          Uploads are hosted on ImgBB. HTTPS links are required.
+          {imgbbEnabled
+            ? "Upload 1–3 images as files (PNG, JPEG or WebP, up to 4 MB each). Images are hosted on ImgBB."
+            : "Image uploads are unavailable until ImgBB is configured on the server."}
         </p>
       </fieldset>
 
@@ -350,12 +362,11 @@ export function MenuItemForm({ item }: MenuItemFormProps) {
       ) : null}
 
       <div className="flex flex-wrap gap-3">
-        <button
+        <Button
           type="submit"
+          variant="brand"
+          size="cta-md"
           disabled={submitting || uploading}
-          className={cn(
-            "inline-flex items-center justify-center gap-2 rounded-full bg-brand-red px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-red-dark disabled:cursor-not-allowed disabled:opacity-60",
-          )}
         >
           {submitting ? (
             <Loader2 aria-hidden="true" className="size-4 animate-spin" />
@@ -367,14 +378,15 @@ export function MenuItemForm({ item }: MenuItemFormProps) {
             : isEdit
               ? "Save changes"
               : "Submit for review"}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="brandOutline"
+          size="cta-md"
           onClick={() => router.push(ROUTES.vendorMyMenuItems)}
-          className="rounded-full border border-brand-brown/15 bg-white px-6 py-3 text-sm font-bold text-brand-brown transition-colors hover:border-brand-red hover:text-brand-red"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );

@@ -12,7 +12,7 @@ const DOT_STYLES: Record<string, string> = {
 export function OrderTimeline({ entries }: { entries: OrderStatusEntry[] }) {
   if (entries.length === 0) {
     return (
-      <p className="text-sm text-brand-brown/45">No status changes recorded.</p>
+      <p className="text-sm text-muted-foreground">No status changes recorded.</p>
     );
   }
 
@@ -23,7 +23,7 @@ export function OrderTimeline({ entries }: { entries: OrderStatusEntry[] }) {
           <div className="flex flex-col items-center">
             <span
               className={cn(
-                "mt-1 size-2.5 rounded-full ring-4 ring-white",
+                "mt-1 size-2.5 rounded-full ring-4 ring-background",
                 DOT_STYLES[entry.status] ?? "bg-brand-brown/40",
               )}
             />

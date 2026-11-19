@@ -1,7 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Bike, Clock, Star } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 import { ROUTES } from "@/constants";
+import { cn } from "@/lib/utils";
 
 export function HeroSection() {
   return (
@@ -31,7 +33,7 @@ export function HeroSection() {
               aria-hidden="true"
               className="h-px w-10 bg-brand-gold/70"
             />
-            <p className="font-serif text-lg italic tracking-wide text-brand-gold sm:text-xl">
+            <p className="font-heading text-lg tracking-wide text-brand-gold sm:text-xl">
               Good Food. Good Mood!
             </p>
           </div>
@@ -70,7 +72,10 @@ export function HeroSection() {
           <div className="mt-9 flex flex-col gap-4 sm:flex-row sm:items-center">
             <Link
               href={ROUTES.browseMenu}
-              className="group inline-flex items-center justify-center gap-3 rounded-full bg-brand-red px-7 py-4 text-sm font-bold uppercase tracking-wide text-white shadow-[0_16px_32px_-14px_rgba(193,18,31,1)] transition-all hover:-translate-y-0.5 hover:bg-brand-red-dark"
+              className={cn(
+                buttonVariants({ variant: "brand", size: "cta-lg" }),
+                "group",
+              )}
             >
               Browse Menu
               <span className="flex size-6 items-center justify-center rounded-full bg-white/15 transition-transform duration-300 group-hover:translate-x-1">

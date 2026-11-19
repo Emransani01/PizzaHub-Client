@@ -12,7 +12,10 @@ export default function ProfileSettingsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-cream">
       <Navbar />
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
+      <main
+        id="main-content"
+        className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 sm:px-6 sm:py-14"
+      >
         <div className="mb-7">
           <p className="text-xs font-bold uppercase tracking-[0.3em] text-brand-red">
             Your account

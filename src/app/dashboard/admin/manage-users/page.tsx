@@ -12,6 +12,72 @@ import type { AdminUser, Paginated, UserRole } from "@/types";
 
 type RoleFilter = UserRole | "all";
 
+type SubscriptionState =
+  | "active"
+  | "expired"
+  | "not-started"
+  | "not-applicable";
+
+const SUBSCRIPTION_STATE_LABELS: Record<SubscriptionState, string> = {
+  active: "Active",
+  expired: "Expired",
+  "not-started": "Not started",
+  "not-applicable": "Not applicable",
+};
+
+const SUBSCRIPTION_STATE_CLASSES: Record<SubscriptionState, string> = {
+  active: "bg-emerald-100 text-emerald-800",
+  expired: "bg-brand-red/10 text-brand-red",
+  "not-started": "bg-brand-brown/10 text-brand-brown/60",
+  "not-applicable": "bg-brand-brown/5 text-brand-brown/40",
+};
+
+function subscriptionState(user: AdminUser): SubscriptionState {
+  if (user.role !== "vendor") return "not-applicable";
+  if (user.subscriptionPlan !== "premium") return "not-started";
+  if (!user.subscriptionExpiresAt) return "active";
+
+  return new Date(user.subscriptionExpiresAt).getTime() > Date.now()
+    ? "active"
+    : "expired";
+}
+
+function subscriptionDetail(user: AdminUser, state: SubscriptionState): string | null {
+  if (state === "not-applicable" || !user.subscriptionExpiresAt) {
+    return state === "active" ? "No expiry date" : null;
+  }
+
+  return state === "expired"
+    ? `Expired ${formatDate(user.subscriptionExpiresAt)}`
+    : `Expires ${formatDate(user.subscriptionExpiresAt)}`;
+}
+
+function SubscriptionInfo({ user }: { user: AdminUser }) {
+  const state = subscriptionState(user);
+  const detail = subscriptionDetail(user, state);
+
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-bold text-brand-brown">
+        {user.role !== "vendor"
+          ? "Not applicable"
+          : user.subscriptionPlan === "premium"
+            ? "Premium"
+            : "Free"}
+      </p>
+      <span
+        className={cn(
+          "inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+          SUBSCRIPTION_STATE_CLASSES[state],
+        )}
+      >
+        {SUBSCRIPTION_STATE_LABELS[state]}
+      </span>
+      {detail ? <p className="text-[11px] text-brand-brown/45">{detail}</p> : null}
+    </div>
+  );
+}
+
 export default function ManageUsersPage() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -82,7 +148,7 @@ export default function ManageUsersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Manage users"
-        description="Block abusive accounts and restore them later. Administrator accounts cannot be blocked."
+        description="Review accounts and read-only Stripe subscription status. Block abusive accounts and restore them later. Administrator accounts cannot be blocked."
       />
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -139,11 +205,12 @@ export default function ManageUsersPage() {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-brand-brown/10 bg-white">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[900px] text-left text-sm">
             <thead>
               <tr className="border-b border-brand-brown/10 text-[11px] uppercase tracking-wide text-brand-brown/40">
                 <th className="px-4 py-3 font-bold">Account</th>
                 <th className="px-4 py-3 font-bold">Role</th>
+                <th className="px-4 py-3 font-bold">Subscription</th>
                 <th className="px-4 py-3 font-bold">Joined</th>
                 <th className="px-4 py-3 font-bold">Status</th>
                 <th className="px-4 py-3 text-right font-bold">Action</th>
@@ -168,6 +235,9 @@ export default function ManageUsersPage() {
                     <span className="rounded-full bg-brand-brown/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-brown/60">
                       {ROLE_LABELS[user.role]}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <SubscriptionInfo user={user} />
                   </td>
                   <td className="px-4 py-3 text-xs text-brand-brown/55">
                     {formatDate(user.createdAt)}

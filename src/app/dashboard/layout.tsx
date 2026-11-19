@@ -62,14 +62,25 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-cream lg:flex">
-      <DashboardSidebar role={required} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <DashboardHeader />
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {children}
-        </main>
+    <>
+      <a
+        href="#dashboard-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-brand-red focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-white"
+      >
+        Skip to dashboard content
+      </a>
+      <div className="min-h-screen bg-cream lg:flex">
+        <DashboardSidebar role={required} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <DashboardHeader />
+          <main
+            id="dashboard-content"
+            className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
+          >
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,3 +1,17 @@
+import {
+  CirclePlus,
+  ClipboardCheck,
+  CreditCard,
+  Crown,
+  Heart,
+  LayoutDashboard,
+  ReceiptText,
+  Settings,
+  ShoppingBag,
+  UtensilsCrossed,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import type { MenuItemStatus, OrderStatus, UserRole } from "@/types";
 
 export const APP_NAME = "PizzaHub";
@@ -11,10 +25,13 @@ export const ROUTES = {
   signUp: "/sign-up",
   chooseRole: "/choose-role",
   menuItem: (id: string) => `/menu/${id}`,
+  menuOrder: (id: string) => `/menu/${id}#order`,
   favorites: "/favorites",
+  cart: "/cart",
   profileSettings: "/profile-settings",
   paymentSuccess: "/payment-success",
   paymentCancel: "/payment-cancel",
+  dashboard: "/dashboard",
   dashboardVendor: "/dashboard/vendor",
   vendorMyMenuItems: "/dashboard/vendor/my-menu-items",
   vendorAddMenuItem: "/dashboard/vendor/add-menu-item",
@@ -78,25 +95,77 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 
 export const DASHBOARD_NAV: Record<
   UserRole,
-  readonly { href: string; label: string }[]
+  readonly { href: string; label: string; icon: LucideIcon }[]
 > = {
   vendor: [
-    { href: ROUTES.dashboardVendor, label: "Overview" },
-    { href: ROUTES.vendorMyMenuItems, label: "My Menu Items" },
-    { href: ROUTES.vendorAddMenuItem, label: "Add Menu Item" },
-    { href: ROUTES.vendorCustomerOrders, label: "Customer Orders" },
-    { href: ROUTES.vendorSubscription, label: "Subscription" },
+    {
+      href: ROUTES.dashboardVendor,
+      label: "Overview",
+      icon: LayoutDashboard,
+    },
+    {
+      href: ROUTES.vendorMyMenuItems,
+      label: "My Menu Items",
+      icon: UtensilsCrossed,
+    },
+    {
+      href: ROUTES.vendorAddMenuItem,
+      label: "Add Menu Item",
+      icon: CirclePlus,
+    },
+    {
+      href: ROUTES.vendorCustomerOrders,
+      label: "Customer Orders",
+      icon: ReceiptText,
+    },
+    {
+      href: ROUTES.vendorSubscription,
+      label: "Subscription",
+      icon: Crown,
+    },
   ],
   customer: [
-    { href: ROUTES.dashboardCustomer, label: "Overview" },
-    { href: ROUTES.customerMyOrders, label: "My Orders" },
-    { href: ROUTES.favorites, label: "Favourites" },
-    { href: ROUTES.profileSettings, label: "Profile Settings" },
+    {
+      href: ROUTES.dashboardCustomer,
+      label: "Overview",
+      icon: LayoutDashboard,
+    },
+    {
+      href: ROUTES.customerMyOrders,
+      label: "My Orders",
+      icon: ShoppingBag,
+    },
+    {
+      href: ROUTES.favorites,
+      label: "Favourites",
+      icon: Heart,
+    },
+    {
+      href: ROUTES.profileSettings,
+      label: "Profile Settings",
+      icon: Settings,
+    },
   ],
   admin: [
-    { href: ROUTES.dashboardAdmin, label: "Overview" },
-    { href: ROUTES.adminManageUsers, label: "Manage Users" },
-    { href: ROUTES.adminManageMenuItems, label: "Manage Menu Items" },
-    { href: ROUTES.adminTransactions, label: "Transactions" },
+    {
+      href: ROUTES.dashboardAdmin,
+      label: "Overview",
+      icon: LayoutDashboard,
+    },
+    {
+      href: ROUTES.adminManageUsers,
+      label: "Manage Users",
+      icon: Users,
+    },
+    {
+      href: ROUTES.adminManageMenuItems,
+      label: "Manage Menu Items",
+      icon: ClipboardCheck,
+    },
+    {
+      href: ROUTES.adminTransactions,
+      label: "Transactions",
+      icon: CreditCard,
+    },
   ],
 };

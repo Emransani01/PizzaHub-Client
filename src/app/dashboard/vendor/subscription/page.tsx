@@ -47,6 +47,23 @@ export default function VendorSubscriptionPage() {
     }
   }, []);
 
+  const latestTransaction = transactions[0] ?? null;
+  const subscriptionMessage = !status
+    ? null
+    : status.premiumActive
+      ? status.expiresAt
+        ? `Active until ${formatDate(status.expiresAt)}.`
+        : "Active. No expiry date is on record."
+      : status.plan === "premium" && status.expiresAt
+        ? `Premium expired on ${formatDate(status.expiresAt)}. Upgrade again to restore unlimited listings.`
+        : latestTransaction?.status === "failed"
+          ? "Your last payment failed. No Premium access was granted."
+          : latestTransaction?.status === "expired"
+            ? "Your last checkout expired before payment completed. No Premium access was granted."
+            : latestTransaction?.status === "cancelled"
+              ? "Your last checkout was cancelled. No Premium access was granted."
+              : `You can keep ${status.freePlanActiveItemLimit} approved and available items live.`;
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -110,11 +127,7 @@ export default function VendorSubscriptionPage() {
                   <p className="text-sm font-extrabold text-brand-brown">
                     {status.premiumActive ? "Premium plan" : "Free plan"}
                   </p>
-                  <p className="text-xs text-brand-brown/55">
-                    {status.premiumActive
-                      ? `Active until ${formatDate(status.expiresAt)}`
-                      : `You can keep ${status.freePlanActiveItemLimit} approved and available items live.`}
-                  </p>
+                  <p className="text-xs text-brand-brown/55">{subscriptionMessage}</p>
                 </div>
               </div>
             </div>

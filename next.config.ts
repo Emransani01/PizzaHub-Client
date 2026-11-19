@@ -20,6 +20,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "i.ibb.co" },
       { protocol: "https", hostname: "ibb.co" },
       { protocol: "https", hostname: "images.unsplash.com" },
+      // Google profile pictures are shown in the navbar and profile menu.
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
     ],
   },
   turbopack: {

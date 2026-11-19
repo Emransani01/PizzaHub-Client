@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Footer } from "@/components/shared/footer";
 import { Navbar } from "@/components/shared/navbar";
+import { PrivateRoute } from "@/components/shared/private-route";
 import { ROUTES } from "@/constants";
 import { errorMessage } from "@/lib/api";
 import { cn, formatCurrency, formatDateTime } from "@/lib/utils";
@@ -20,6 +21,7 @@ import type { CheckoutStatus } from "@/types";
 
 const POLL_MS = 3000;
 const MAX_ATTEMPTS = 20;
+const VENDOR_ONLY = ["vendor"] as const;
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
@@ -69,7 +71,10 @@ function PaymentSuccessContent() {
   return (
     <div className="flex min-h-screen flex-col bg-cream">
       <Navbar />
-      <main className="flex flex-1 items-center justify-center px-4 py-12 sm:px-6">
+      <main
+        id="main-content"
+        className="flex flex-1 items-center justify-center px-4 py-12 sm:px-6"
+      >
         <div className="w-full max-w-lg rounded-[1.75rem] border border-brand-brown/10 bg-white p-7 text-center shadow-[0_28px_60px_-44px_rgba(43,26,18,0.6)] sm:p-9">
           {!sessionId ? (
             <>
@@ -206,16 +211,18 @@ function PaymentSuccessContent() {
 
 export default function PaymentSuccessPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center bg-cream">
-          <p className="text-sm font-semibold text-brand-brown/60">
-            Checking your payment…
-          </p>
-        </div>
-      }
-    >
-      <PaymentSuccessContent />
-    </Suspense>
+    <PrivateRoute roles={VENDOR_ONLY}>
+      <Suspense
+        fallback={
+          <div className="flex min-h-screen items-center justify-center bg-cream">
+            <p className="text-sm font-semibold text-brand-brown/60">
+              Checking your payment…
+            </p>
+          </div>
+        }
+      >
+        <PaymentSuccessContent />
+      </Suspense>
+    </PrivateRoute>
   );
 }

@@ -49,7 +49,7 @@ export default function Home() {
   return (
     <div id="top" className="flex min-h-screen flex-col bg-cream">
       <Navbar />
-      <main className="flex-1">
+      <main id="main-content" className="flex-1">
         <HeroSection />
         <ServiceHighlights />
         <Suspense fallback={<CategoriesFallback />}>
