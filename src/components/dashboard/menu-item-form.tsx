@@ -183,7 +183,7 @@ export function MenuItemForm({ item }: MenuItemFormProps) {
       onSubmit={onSubmit}
       className="space-y-5 rounded-[1.5rem] border border-brand-brown/10 bg-white p-6 shadow-[0_20px_50px_-42px_rgba(43,26,18,0.55)]"
     >
-      {isEdit && item?.status === "approved" ? (
+      {isEdit && (item?.status === "approved" || item?.status === "inactive") ? (
         <p className="rounded-xl border border-brand-gold/50 bg-brand-gold/10 px-3 py-2 text-xs font-semibold leading-5 text-brand-brown/70">
           Changing the name, category, description, price, location or images
           sends this item back to <strong>pending review</strong>. Availability-only

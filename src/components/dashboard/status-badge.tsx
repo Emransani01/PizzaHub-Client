@@ -14,9 +14,7 @@ const ORDER_STYLES: Record<OrderStatus, string> = {
     "bg-brand-brown/10 text-brand-brown/60 dark:bg-brand-brown/15 dark:text-brand-brown/70",
 };
 
-type MenuDisplayStatus = MenuItemStatus | "inactive";
-
-const MENU_STYLES: Record<MenuDisplayStatus, string> = {
+const MENU_STYLES: Record<MenuItemStatus, string> = {
   pending: "bg-brand-gold/20 text-brand-brown dark:bg-brand-gold/15 dark:text-brand-gold",
   approved:
     "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300",
@@ -42,13 +40,12 @@ export function MenuStatusBadge({
   status: MenuItemStatus;
   isAvailable?: boolean;
 }) {
-  // The assignment lists "inactive" alongside the approval statuses, but the
-  // application models it as an approved item the vendor has paused. Keeping
-  // it derived avoids contradictory combinations such as "inactive" + available.
-  const displayStatus: MenuDisplayStatus =
+  // The server now returns `inactive` directly, but keep the availability
+  // fallback for older cached responses that still report approved + unavailable.
+  const displayStatus: MenuItemStatus =
     status === "approved" && isAvailable === false ? "inactive" : status;
 
-  const labels: Record<MenuDisplayStatus, string> = {
+  const labels: Record<MenuItemStatus, string> = {
     pending: "Pending review",
     approved: "Approved",
     rejected: "Rejected",

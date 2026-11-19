@@ -10,8 +10,9 @@ there is no demo or placeholder data left in the UI.
 
 ## Links
 
-- Live website URL: **TO BE FILLED AFTER DEPLOYMENT**
-- Client GitHub repository URL: **TO BE FILLED AFTER PUBLISHING (separate client repo)**
+- Live client website URL: **PENDING DEPLOYMENT — no verified live URL yet**
+- Live API deployment: <https://pizza-hub-server.vercel.app>
+- Client GitHub repository URL: <https://github.com/Emransani01/PizzaHub-Client>
 - Server GitHub repository URL: <https://github.com/Emransani01/PizzaHub-Server>
 
 ## Tech stack
@@ -144,9 +145,10 @@ never the security boundary.
 
 Browse Menu combines multiple server-side controls against `GET /api/menu-items`:
 
-- **Search:** text query matched server-side (case-insensitively) across item name,
-  description, category, and location.
-- **Filters:** category (six fixed categories) and location.
+- **Search:** text query matched server-side (case-insensitively) across item name
+  and description.
+- **Filters:** category (six fixed categories) and exact location selected from
+  `GET /api/menu-items/locations`; both combine with search and sorting.
 - **Sorting:** newest (default), price ascending, price descending.
 - **Pagination and states:** paged results with explicit loading, empty, and error
   states. Public listings show only admin-approved and available items.
@@ -162,9 +164,13 @@ Browse Menu combines multiple server-side controls against `GET /api/menu-items`
   polls `GET /api/subscriptions/checkout/:sessionId` and reports the transaction
   status; it never upgrades the account. Expired/failed/cancelled checkout states
   are surfaced without granting Premium.
-- **Approval lifecycle:** new and content-edited items are `pending` until an
-  admin approves them. Rejections carry an optional reason shown to the vendor.
-  Admins can delete inappropriate items (blocked when an item has order history).
+- **Approval lifecycle:** statuses are `pending`, `approved`, `rejected` and
+  `inactive`. New and content-edited items are `pending` until an admin approves
+  them; admins can pause published items as `inactive`, and vendors can toggle
+  availability between `approved` and `inactive`. Rejections carry an optional
+  reason shown to the vendor. Inactive and rejected items never appear publicly
+  and cannot be ordered. Admins can delete inappropriate items (blocked when an
+  item has order history).
 - **Menu images:** add/edit menu items require uploading 1–3 image files through
   ImgBB (no pasted URL option); sign-up supports an optional profile image upload.
 - **Order timeline:** every accepted/rejected/cancelled transition is listed with
@@ -219,8 +225,11 @@ npm run build
 
 ## Deployment notes
 
-- Deploy the API first, then set `API_URL` to its public HTTPS origin and build
-  the client.
+- The API is currently deployed on Vercel at
+  <https://pizza-hub-server.vercel.app>. The client is **not deployed yet**; the
+  live client URL remains pending.
+- Deploy the client (Vercel or another Next.js host), then set `API_URL` to the
+  public API HTTPS origin and build the client.
 - Set the API's `CLIENT_URL` and `BETTER_AUTH_URL` to the deployed client origin.
 - Configure the Google OAuth redirect URI as
   `<CLIENT_ORIGIN>/api/auth/callback/google`.

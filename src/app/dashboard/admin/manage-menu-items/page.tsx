@@ -99,25 +99,28 @@ export default function ManageMenuItemsPage() {
   async function approve(item: MenuItem) {
     setBusyId(item.id);
     try {
-      const updated = await setMenuItemStatus(item.id, "approved");
-      setData((current) =>
-        current
-          ? {
-              ...current,
-              items:
-                status === "pending"
-                  ? current.items.filter((entry) => entry.id !== updated.id)
-                  : current.items.map((entry) =>
-                      entry.id === updated.id ? updated : entry,
-                    ),
-              total:
-                status === "pending"
-                  ? Math.max(0, current.total - 1)
-                  : current.total,
-            }
-          : current,
+      await setMenuItemStatus(item.id, "approved");
+      // Refetch so the active tab, pagination and total always match the
+      // server's post-transition state, including reactivation from inactive.
+      await load();
+      toast.success(
+        item.status === "inactive"
+          ? "Menu item reactivated and published."
+          : "Menu item approved and published.",
       );
-      toast.success("Menu item approved and published.");
+    } catch (cause) {
+      toast.error(errorMessage(cause));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deactivate(item: MenuItem) {
+    setBusyId(item.id);
+    try {
+      await setMenuItemStatus(item.id, "inactive");
+      await load();
+      toast.success("Menu item is now inactive and hidden from customers.");
     } catch (cause) {
       toast.error(errorMessage(cause));
     } finally {
@@ -128,28 +131,12 @@ export default function ManageMenuItemsPage() {
   async function reject(item: MenuItem) {
     setBusyId(item.id);
     try {
-      const updated = await setMenuItemStatus(
+      await setMenuItemStatus(
         item.id,
         "rejected",
         reason.trim() || undefined,
       );
-      setData((current) =>
-        current
-          ? {
-              ...current,
-              items:
-                status === "pending"
-                  ? current.items.filter((entry) => entry.id !== updated.id)
-                  : current.items.map((entry) =>
-                      entry.id === updated.id ? updated : entry,
-                    ),
-              total:
-                status === "pending"
-                  ? Math.max(0, current.total - 1)
-                  : current.total,
-            }
-          : current,
-      );
+      await load();
       toast.success("Menu item rejected. The vendor can fix and resubmit it.");
       setRejectingId(null);
       setReason("");
@@ -192,7 +179,7 @@ export default function ManageMenuItemsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Manage menu items"
-        description="Approve listings for the public menu or reject them with a reason. Free vendors can hold at most three approved and available items."
+        description="Approve, reject, or deactivate listings. Inactive and rejected items never appear on the public menu; free vendors can hold at most three active items."
       />
 
       <div className="rounded-2xl border border-brand-brown/10 bg-white p-4">
@@ -278,7 +265,9 @@ export default function ManageMenuItemsPage() {
           <span className="mr-1 text-xs font-bold uppercase tracking-wide text-brand-brown/45">
             Status
           </span>
-          {(["pending", "approved", "rejected", "all"] as StatusFilter[]).map(
+          {(
+            ["pending", "approved", "rejected", "inactive", "all"] as StatusFilter[]
+          ).map(
             (option) => (
               <button
                 key={option}
@@ -392,6 +381,17 @@ export default function ManageMenuItemsPage() {
                         <Check aria-hidden="true" className="size-3.5" />
                       )}
                       Approve
+                    </button>
+                  ) : null}
+
+                  {item.status === "approved" ? (
+                    <button
+                      type="button"
+                      onClick={() => void deactivate(item)}
+                      disabled={busyId === item.id || deletingId === item.id}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-brand-brown/20 px-4 py-2 text-xs font-bold uppercase tracking-wide text-brand-brown transition-colors hover:border-brand-red hover:text-brand-red disabled:opacity-50"
+                    >
+                      Deactivate
                     </button>
                   ) : null}
 

@@ -90,7 +90,7 @@ export default function MyMenuItemsPage() {
     <div className="space-y-6">
       <PageHeader
         title="My menu items"
-        description="Approved and available items are visible to customers. Changes to content require re-approval."
+        description="Approved and available items are visible to customers. Inactive items stay here so you can reactivate them; content changes require re-approval."
       >
         <Link
           href={ROUTES.vendorAddMenuItem}

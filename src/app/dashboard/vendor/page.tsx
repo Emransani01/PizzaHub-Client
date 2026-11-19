@@ -109,13 +109,20 @@ export default function VendorDashboardPage() {
             </div>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <StatsCard
-              label="Live menu items"
-              value={`${stats.activeItems}${stats.premiumActive ? "" : ` / ${stats.activeItemLimit}`}`}
-              hint={`${stats.approvedItems} approved in total`}
+              label="Total menu items"
+              value={stats.totalItems}
+              hint="All items you have submitted"
               icon={CirclePlus}
               accent="red"
+            />
+            <StatsCard
+              label="Active menu items"
+              value={`${stats.activeItems}${stats.premiumActive ? "" : ` / ${stats.activeItemLimit}`}`}
+              hint={`${stats.inactiveItems} inactive · ${stats.approvedItems} approved`}
+              icon={CircleCheck}
+              accent="green"
             />
             <StatsCard
               label="Awaiting review"

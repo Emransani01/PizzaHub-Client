@@ -85,6 +85,7 @@ export const MENU_STATUS_LABELS: Record<MenuItemStatus, string> = {
   pending: "Pending review",
   approved: "Approved",
   rejected: "Rejected",
+  inactive: "Inactive",
 };
 
 export const ROLE_LABELS: Record<UserRole, string> = {

@@ -2,7 +2,14 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, CircleAlert, SlidersHorizontal } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CircleAlert,
+  RotateCcw,
+  SlidersHorizontal,
+  UtensilsCrossed,
+} from "lucide-react";
 import { MenuFilters } from "@/components/menu/menu-filters";
 import { MenuGrid } from "@/components/menu/menu-grid";
 import { MenuSearch } from "@/components/menu/menu-search";
@@ -12,7 +19,7 @@ import { Navbar } from "@/components/shared/navbar";
 import { buttonVariants } from "@/components/ui/button";
 import { errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { listMenuItems } from "@/services/menu";
+import { listLocations, listMenuItems } from "@/services/menu";
 import type { MenuItem, Paginated } from "@/types";
 
 type SortOption = "newest" | "price_asc" | "price_desc";
@@ -28,6 +35,7 @@ function BrowseMenuContent() {
   const searchParams = useSearchParams();
 
   const category = searchParams.get("category") ?? "";
+  const location = searchParams.get("location") ?? "";
   const sort = (searchParams.get("sort") as SortOption | null) ?? "newest";
   const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
   const searchFromUrl = searchParams.get("search") ?? "";
@@ -37,17 +45,18 @@ function BrowseMenuContent() {
   const [data, setData] = useState<Paginated<MenuItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [locations, setLocations] = useState<string[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(true);
+  const [locationsError, setLocationsError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const firstRender = useRef(true);
+  const lastUrlSearchRef = useRef(searchFromUrl);
 
   const updateQuery = useCallback(
     (patch: Record<string, string | number | undefined>) => {
       const params = new URLSearchParams(searchParams.toString());
       for (const [key, value] of Object.entries(patch)) {
         if (value === undefined || value === "" || value === 1) {
-          if (key === "page") params.delete(key);
-          else if (value === "") params.delete(key);
-          else params.set(key, String(value));
+          params.delete(key);
         } else {
           params.set(key, String(value));
         }
@@ -60,6 +69,17 @@ function BrowseMenuContent() {
     [router, searchParams],
   );
 
+  // Browser back/forward or a direct link changes the URL outside the debounced
+  // input. Treat that URL as authoritative, but ignore our own router.replace().
+  useEffect(() => {
+    if (searchFromUrl === lastUrlSearchRef.current) return;
+
+    const normalized = searchFromUrl.trim();
+    lastUrlSearchRef.current = searchFromUrl;
+    setSearch(normalized);
+    setDebouncedSearch(normalized);
+  }, [searchFromUrl]);
+
   // Keep the URL in sync with the local search box without resetting the input
   // on every keystroke.
   useEffect(() => {
@@ -68,39 +88,80 @@ function BrowseMenuContent() {
   }, [search]);
 
   useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false;
-      return;
-    }
     if (debouncedSearch === searchFromUrl) return;
+
+    lastUrlSearchRef.current = debouncedSearch;
     updateQuery({ search: debouncedSearch || undefined, page: 1 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
+  }, [debouncedSearch, searchFromUrl, updateQuery]);
 
   useEffect(() => {
-    const controller = new AbortController();
+    let cancelled = false;
+    setLocationsLoading(true);
+    setLocationsError(null);
+
+    listLocations()
+      .then((result) => {
+        if (!cancelled) setLocations(result.locations ?? []);
+      })
+      .catch((cause) => {
+        if (!cancelled) setLocationsError(errorMessage(cause));
+      })
+      .finally(() => {
+        if (!cancelled) setLocationsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
 
     listMenuItems({
       category: category || undefined,
+      location: location || undefined,
       sort,
       page,
       limit: 12,
       search: debouncedSearch || undefined,
     })
       .then((result) => {
-        if (!controller.signal.aborted) setData(result);
+        if (!cancelled) setData(result);
       })
       .catch((cause) => {
-        if (!controller.signal.aborted) setError(errorMessage(cause));
+        if (!cancelled) setError(errorMessage(cause));
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!cancelled) setLoading(false);
       });
 
-    return () => controller.abort();
-  }, [category, sort, page, debouncedSearch, reloadKey]);
+    return () => {
+      cancelled = true;
+    };
+  }, [category, location, sort, page, debouncedSearch, reloadKey]);
+
+  const hasMenuFilters =
+    Boolean(search.trim()) ||
+    Boolean(debouncedSearch.trim()) ||
+    category.length > 0 ||
+    location.length > 0 ||
+    sort !== "newest";
+
+  function clearFilters() {
+    lastUrlSearchRef.current = "";
+    setSearch("");
+    setDebouncedSearch("");
+    updateQuery({
+      search: undefined,
+      category: "",
+      location: "",
+      sort: undefined,
+      page: 1,
+    });
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-cream">
@@ -150,7 +211,14 @@ function BrowseMenuContent() {
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
             <MenuFilters
               activeCategory={category}
-              onChange={(next) => updateQuery({ category: next, page: 1 })}
+              activeLocation={location}
+              canReset={hasMenuFilters}
+              locations={locations}
+              locationsLoading={locationsLoading}
+              locationsError={locationsError}
+              onCategoryChange={(next) => updateQuery({ category: next, page: 1 })}
+              onLocationChange={(next) => updateQuery({ location: next, page: 1 })}
+              onReset={clearFilters}
             />
 
             <div className="mt-5 flex items-center justify-between gap-4 text-sm text-brand-brown/55">
@@ -193,6 +261,29 @@ function BrowseMenuContent() {
                   >
                     Try again
                   </button>
+                </EmptyState>
+              ) : (data?.items.length ?? 0) === 0 ? (
+                <EmptyState
+                  icon={UtensilsCrossed}
+                  title="No dishes to show"
+                  description={
+                    hasMenuFilters
+                      ? "No approved and available dishes match these filters."
+                      : "No approved and available dishes have been published yet."
+                  }
+                >
+                  {hasMenuFilters ? (
+                    <button
+                      type="button"
+                      onClick={clearFilters}
+                      className={cn(
+                        buttonVariants({ variant: "brandOutline", size: "cta-md" }),
+                      )}
+                    >
+                      <RotateCcw aria-hidden="true" className="size-4" />
+                      Clear filters
+                    </button>
+                  ) : null}
                 </EmptyState>
               ) : (
                 <MenuGrid items={data?.items ?? []} />

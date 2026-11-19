@@ -2,7 +2,11 @@ export type UserRole = "customer" | "vendor" | "admin";
 
 export type SubscriptionPlan = "free" | "premium";
 
-export type MenuItemStatus = "pending" | "approved" | "rejected";
+export type MenuItemStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "inactive";
 
 export type OrderStatus = "pending" | "accepted" | "rejected" | "cancelled";
 
@@ -139,6 +143,7 @@ export interface VendorStats {
   pendingItems: number;
   rejectedItems: number;
   activeItems: number;
+  inactiveItems: number;
   activeItemLimit: number;
   totalOrders: number;
   orders: Record<OrderStatus, number>;
@@ -163,6 +168,7 @@ export interface AdminStats {
   pendingItems: number;
   approvedItems: number;
   rejectedItems: number;
+  inactiveItems: number;
   totalOrders: number;
   orders: Record<OrderStatus, number>;
   paidTransactions: number;

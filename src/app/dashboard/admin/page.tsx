@@ -89,20 +89,41 @@ export default function AdminDashboardPage() {
         </div>
       ) : stats ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatsCard
-              label="Accounts"
+              label="Total accounts"
               value={stats.totalUsers}
-              hint={`${stats.vendors} vendors · ${stats.customers} customers`}
+              hint={`${stats.admins} admins`}
               icon={Users}
               accent="brown"
             />
             <StatsCard
-              label="Pending menu items"
-              value={stats.pendingItems}
-              hint={`${stats.approvedItems} approved · ${stats.rejectedItems} rejected`}
+              label="Vendors"
+              value={stats.vendors}
+              hint="Registered vendor accounts"
+              icon={Users}
+              accent="red"
+            />
+            <StatsCard
+              label="Customers"
+              value={stats.customers}
+              hint="Registered customer accounts"
+              icon={Users}
+              accent="green"
+            />
+            <StatsCard
+              label="Total menu items"
+              value={stats.totalItems}
+              hint="All submitted listings"
               icon={ClipboardCheck}
               accent="gold"
+            />
+            <StatsCard
+              label="Pending menu items"
+              value={stats.pendingItems}
+              hint={`${stats.approvedItems} approved · ${stats.inactiveItems} inactive`}
+              icon={ClipboardCheck}
+              accent="brown"
             />
             <StatsCard
               label="Orders"
