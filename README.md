@@ -10,7 +10,7 @@ there is no demo or placeholder data left in the UI.
 
 ## Links
 
-- Live client website URL: **PENDING DEPLOYMENT — no verified live URL yet**
+- Live client website URL: <https://pizza-hub-client.vercel.app>
 - Live API deployment: <https://pizza-hub-server.vercel.app>
 - Client GitHub repository URL: <https://github.com/Emransani01/PizzaHub-Client>
 - Server GitHub repository URL: <https://github.com/Emransani01/PizzaHub-Server>
@@ -28,7 +28,7 @@ there is no demo or placeholder data left in the UI.
 
 ## Requirements
 
-- Node.js 20 or newer
+- Node.js 22.12.x, 24.x, or 26.x
 - npm 10 or newer
 - The PizzaHub API running (see `../server/README.md`)
 
@@ -73,6 +73,7 @@ For deployment, point `API_URL` at the public API origin (for example
 | `npm run build` | Production build (also runs the TypeScript check). |
 | `npm start` | Serve the production build. |
 | `npm run lint` | ESLint with the Next.js core-web-vitals + TypeScript configs. |
+| `npm test` | Run the Vitest test suite. |
 | `npx tsc --noEmit` | Standalone type check. |
 
 ## Authentication flow and JWT verification middleware
@@ -95,9 +96,9 @@ For deployment, point `API_URL` at the public API origin (for example
    from MongoDB, and rejects invalid/expired tokens with `401`. `checkBlockedUser`
    blocks protected operations for blocked accounts (`403`), `authorizeRole(...)`
    enforces role access (`403`), and services enforce ownership/state transitions
-   (never trusting client-supplied user ID/role). Item details are publicly
-   viewable, but ordering and protected actions require sign-in and server-side
-   authorization.
+   (never trusting client-supplied user ID/role). Item detail pages require
+   authentication; unauthenticated users are redirected to Sign In. Ordering and
+   protected actions also require server-side authorization.
 6. Signing out clears the in-memory token and the session cookie.
 
 `src/proxy.ts` performs a cookie-presence check for nicer navigation. It is a UX
@@ -122,7 +123,9 @@ never the security boundary.
 | --- | --- |
 | `/` | Homepage: live featured dishes, category cards, how it works, vendor CTA |
 | `/browse-menu` | Search, category/location filters, sorting, pagination |
-| `/menu/[id]` | Item gallery, details, favourite toggle, order form (no payment) |
+| `/cart` | Signed-in customer cart with quantity controls and price-change review (requires authentication) |
+| `/checkout` | Signed-in customer checkout with authoritative order quote (requires authentication) |
+| `/menu/[id]` | Item gallery, details, favourite toggle, order form (no payment); requires authentication and redirects unauthenticated users to Sign In |
 | `/favorites` | The signed-in customer's saved dishes |
 | `/sign-in`, `/sign-up`, `/choose-role` | Authentication and role onboarding |
 | `/profile-settings` | Name, avatar (ImgBB upload), vendor business name |
@@ -227,8 +230,8 @@ npm run build
 ## Deployment notes
 
 - The API is currently deployed on Vercel at
-  <https://pizza-hub-server.vercel.app>. The client is **not deployed yet**; the
-  live client URL remains pending.
+  <https://pizza-hub-server.vercel.app>. The client is deployed on Vercel at
+  <https://pizza-hub-client.vercel.app>.
 - Deploy the client (Vercel or another Next.js host), then set `API_URL` to the
   public API HTTPS origin and build the client.
 - Set the API's `CLIENT_URL` and `BETTER_AUTH_URL` to the deployed client origin.
