@@ -6,7 +6,13 @@ const SESSION_COOKIES = [
   "__Secure-better-auth.session_token",
 ];
 
-const PROTECTED_PREFIXES = ["/dashboard", "/profile-settings", "/favorites"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/profile-settings",
+  "/favorites",
+  "/cart",
+  "/checkout",
+];
 const PROTECTED_EXACT_PATHS = ["/payment-success", "/payment-cancel"];
 const MENU_DETAIL_PREFIX = "/menu/";
 
@@ -46,6 +52,8 @@ export const config = {
     "/dashboard/:path*",
     "/profile-settings",
     "/favorites",
+    "/cart/:path*",
+    "/checkout/:path*",
     "/menu/:id",
     "/payment-success",
     "/payment-cancel",

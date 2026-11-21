@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
+import { AuthAccessError } from "@/components/shared/auth-access-error";
 import { ROUTES } from "@/constants";
 import { roleHome, useAuth } from "@/providers/auth-provider";
 import type { UserRole } from "@/types";
@@ -23,7 +24,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading, refreshing, authError, refresh } = useAuth();
 
   const required = requiredRole(pathname);
   const allowed = Boolean(
@@ -31,7 +32,7 @@ export default function DashboardLayout({
   );
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || (!user && authError)) return;
 
     if (!user) {
       router.replace(
@@ -48,7 +49,17 @@ export default function DashboardLayout({
     if (user.role !== required) {
       router.replace(roleHome(user.role));
     }
-  }, [loading, pathname, required, router, user]);
+  }, [authError, loading, pathname, required, router, user]);
+
+  if (!loading && !user && authError) {
+    return (
+      <AuthAccessError
+        error={authError}
+        refreshing={refreshing}
+        onRetry={() => void refresh()}
+      />
+    );
+  }
 
   if (loading || !allowed) {
     return (

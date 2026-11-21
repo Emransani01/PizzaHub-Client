@@ -13,12 +13,7 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
-import {
-  clearAccessToken,
-  errorMessage,
-  fetchToken,
-  type TokenResponse,
-} from "@/lib/api";
+import { clearAccessToken, errorMessage, fetchToken } from "@/lib/api";
 import {
   addFavorite,
   listFavorites,
@@ -26,24 +21,47 @@ import {
 } from "@/services/favorites";
 import type { UserProfile } from "@/types";
 
+/** Non-destructive auth failures that protected routes need to distinguish. */
+export interface AuthError {
+  kind: "forbidden" | "unavailable";
+  message: string;
+}
+
 interface AuthContextValue {
   user: UserProfile | null;
   loading: boolean;
+  refreshing: boolean;
+  authError: AuthError | null;
   favoriteIds: string[];
+  /** Existing retry entry point; the auth-error panel calls this directly. */
   refresh: () => Promise<UserProfile | null>;
   setUser: (user: UserProfile | null) => void;
   signOut: () => Promise<void>;
+  signingOut: boolean;
+  /**
+   * Incremented only after Better Auth confirms a successful sign-out. The cart
+   * provider uses this to distinguish a real sign-out from a transient auth
+   * failure, which must never destroy the stored cart.
+   */
+  signOutEpoch: number;
   toggleFavorite: (itemId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+const SIGN_OUT_ERROR_MESSAGE =
+  "We couldn't sign you out. Check your connection and try again.";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutEpoch, setSignOutEpoch] = useState(0);
+  const signOutPromise = useRef<Promise<void> | null>(null);
+  const [authError, setAuthError] = useState<AuthError | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const mounted = useRef(true);
 
@@ -54,17 +72,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const applySession = useCallback((session: TokenResponse | null) => {
-    if (!mounted.current) return;
-    setUser(session?.user ?? null);
-    setLoading(false);
-  }, []);
-
   const refresh = useCallback(async () => {
-    const session = await fetchToken();
-    applySession(session);
-    return session?.user ?? null;
-  }, [applySession]);
+    if (mounted.current) setRefreshing(true);
+
+    try {
+      const result = await fetchToken();
+      if (!mounted.current) {
+        return result.kind === "authenticated" ? result.session.user : null;
+      }
+
+      switch (result.kind) {
+        case "authenticated":
+          setUser(result.session.user);
+          setAuthError(null);
+          setLoading(false);
+          return result.session.user;
+        case "unauthenticated":
+          // A genuine 401 is the only case that clears a valid session.
+          setUser(null);
+          setAuthError(null);
+          setLoading(false);
+          return null;
+        case "forbidden":
+          setUser(null);
+          setAuthError({ kind: "forbidden", message: result.message });
+          setLoading(false);
+          return null;
+        case "unavailable":
+          // Keep both the user and the in-memory token untouched.
+          setAuthError({ kind: "unavailable", message: result.message });
+          setLoading(false);
+          return null;
+      }
+    } finally {
+      if (mounted.current) setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     void refresh();
@@ -106,14 +149,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
-  const signOut = useCallback(async () => {
-    await authClient.signOut().catch(() => undefined);
-    clearAccessToken();
-    setUser(null);
-    setFavoriteIds([]);
-    toast.success("You have been signed out.");
-    router.push("/");
-    router.refresh();
+  const signOut = useCallback(() => {
+    // Concurrent clicks share one request instead of issuing duplicate
+    // Better Auth sign-out calls.
+    if (signOutPromise.current) return signOutPromise.current;
+
+    const operation = (async () => {
+      if (mounted.current) setSigningOut(true);
+
+      try {
+        // Better Auth resolves with `{ data, error }`; it does not necessarily
+        // throw when the request fails, so success must be confirmed explicitly.
+        const result = await authClient.signOut();
+
+        if (result?.error || !result?.data?.success) {
+          const message =
+            typeof result?.error?.message === "string" &&
+            result.error.message.trim().length > 0
+              ? result.error.message
+              : SIGN_OUT_ERROR_MESSAGE;
+          toast.error(message);
+          return;
+        }
+
+        // Only a confirmed success may destroy local session state.
+        clearAccessToken();
+        if (mounted.current) {
+          setUser(null);
+          setFavoriteIds([]);
+          setSignOutEpoch((value) => value + 1);
+        }
+        toast.success("You have been signed out.");
+        router.push("/");
+        router.refresh();
+      } catch {
+        toast.error(SIGN_OUT_ERROR_MESSAGE);
+      } finally {
+        if (mounted.current) setSigningOut(false);
+      }
+    })();
+
+    signOutPromise.current = operation;
+    void operation.finally(() => {
+      signOutPromise.current = null;
+    });
+
+    return operation;
   }, [router]);
 
   const toggleFavorite = useCallback(
@@ -156,13 +237,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       loading,
+      refreshing,
+      authError,
       favoriteIds,
       refresh,
       setUser,
       signOut,
+      signingOut,
+      signOutEpoch,
       toggleFavorite,
     }),
-    [user, loading, favoriteIds, refresh, signOut, toggleFavorite],
+    [
+      user,
+      loading,
+      refreshing,
+      authError,
+      favoriteIds,
+      refresh,
+      signOut,
+      signingOut,
+      signOutEpoch,
+      toggleFavorite,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -28,6 +28,7 @@ export const ROUTES = {
   menuOrder: (id: string) => `/menu/${id}#order`,
   favorites: "/favorites",
   cart: "/cart",
+  checkout: "/checkout",
   profileSettings: "/profile-settings",
   paymentSuccess: "/payment-success",
   paymentCancel: "/payment-cancel",
@@ -66,6 +67,11 @@ export const CATEGORY_IMAGES: Record<string, string> = {
 };
 
 export const FALLBACK_FOOD_IMAGE = "/images/home/margherita.jpg";
+
+/** Client cart constraints, mirrored by the quote/checkout API validation. */
+export const CART_MAX_LINES = 20;
+export const CART_MAX_QUANTITY = 20;
+export const CART_STORAGE_PREFIX = "pizzahub:cart:v1:";
 
 export const ORDER_STATUSES = [
   "pending",

@@ -5,6 +5,7 @@ import { MotionConfig } from "motion/react";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import { AuthProvider } from "./auth-provider";
+import { CartProvider } from "./cart-provider";
 
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
@@ -17,13 +18,15 @@ export function AppProviders({ children }: { children: ReactNode }) {
     >
       <MotionConfig reducedMotion="user">
         <AuthProvider>
-          {children}
-          <Toaster
-            position="top-center"
-            richColors
-            closeButton
-            toastOptions={{ duration: 4200 }}
-          />
+          <CartProvider>
+            {children}
+            <Toaster
+              position="top-center"
+              richColors
+              closeButton
+              toastOptions={{ duration: 4200 }}
+            />
+          </CartProvider>
         </AuthProvider>
       </MotionConfig>
     </ThemeProvider>

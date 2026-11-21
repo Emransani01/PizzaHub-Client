@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { AuthAccessError } from "@/components/shared/auth-access-error";
 import { ROUTES } from "@/constants";
 import { safeNextPath } from "@/lib/navigation";
 import { roleHome, useAuth } from "@/providers/auth-provider";
@@ -25,7 +26,7 @@ interface PrivateRouteProps {
 export function PrivateRoute({ children, roles }: PrivateRouteProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, loading } = useAuth();
+  const { user, loading, refreshing, authError, refresh } = useAuth();
 
   const allowed = Boolean(
     user &&
@@ -34,7 +35,7 @@ export function PrivateRoute({ children, roles }: PrivateRouteProps) {
   );
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || (!user && authError)) return;
 
     if (!user) {
       const destination = safeNextPath(
@@ -55,7 +56,17 @@ export function PrivateRoute({ children, roles }: PrivateRouteProps) {
     if (roles && !roles.includes(user.role)) {
       router.replace(roleHome(user.role));
     }
-  }, [loading, pathname, roles, router, user]);
+  }, [authError, loading, pathname, roles, router, user]);
+
+  if (!loading && !user && authError) {
+    return (
+      <AuthAccessError
+        error={authError}
+        refreshing={refreshing}
+        onRetry={() => void refresh()}
+      />
+    );
+  }
 
   if (loading || !allowed) {
     return (

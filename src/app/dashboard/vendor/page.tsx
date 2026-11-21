@@ -168,24 +168,32 @@ export default function VendorDashboardPage() {
                 </p>
               ) : (
                 <ul className="divide-y divide-brand-brown/10">
-                  {data?.recentOrders.map((order) => (
-                    <li key={order.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-brand-brown">
-                          {order.itemName}
-                        </p>
-                        <p className="truncate text-xs text-brand-brown/50">
-                          {order.customerName} · {formatDate(order.deliveryDate)}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1">
-                        <OrderStatusBadge status={order.status} />
-                        <span className="text-xs font-bold text-brand-brown/60">
-                          {formatCurrency(order.itemPrice)}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
+                  {data?.recentOrders.map((order) => {
+                    const quantity = order.quantity ?? 1;
+                    return (
+                      <li key={order.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-brand-brown">
+                            {order.itemName}
+                          </p>
+                          <p className="truncate text-xs text-brand-brown/50">
+                            {order.customerName} · {formatDate(order.deliveryDate)}
+                          </p>
+                          <p className="text-[11px] text-brand-brown/45">
+                            Quantity × {quantity}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <OrderStatusBadge status={order.status} />
+                          <span className="text-xs font-bold text-brand-brown/60">
+                            {formatCurrency(
+                              order.lineTotal ?? order.itemPrice * quantity,
+                            )}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </DashboardPanel>

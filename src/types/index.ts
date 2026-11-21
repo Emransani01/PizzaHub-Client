@@ -65,6 +65,12 @@ export interface Order {
   itemName: string;
   itemImage: string | null;
   itemPrice: number;
+  /** Number of this menu item in the checkout line that produced the order. */
+  quantity: number;
+  /** `itemPrice × quantity` for this single order line. */
+  lineTotal: number;
+  /** Stable id shared by every order created by one checkout submission. */
+  checkoutGroupId: string | null;
   vendorId: string;
   vendorName: string;
   customerId: string;
@@ -76,6 +82,83 @@ export interface Order {
   statusHistory: OrderStatusEntry[];
   createdAt: string | null;
   updatedAt: string | null;
+}
+
+/** A single line stored in the browser cart, keyed by menu item id. */
+export interface CartItem {
+  itemId: string;
+  quantity: number;
+  itemName: string;
+  category: string;
+  vendorId: string;
+  vendorName: string;
+  /** Unit price captured when the item was added; used as the quote's expected price. */
+  unitPrice: number;
+  image: string | null;
+}
+
+/** The versioned payload persisted under `pizzahub:cart:v1:<userId>`. */
+export interface CartSnapshot {
+  version: 1;
+  items: CartItem[];
+  updatedAt: string;
+}
+
+export type CartQuoteIssueCode =
+  | "MISSING"
+  | "UNAVAILABLE"
+  | "OWN_ITEM"
+  | "PRICE_CHANGED";
+
+export interface CartQuoteIssue {
+  itemId: string;
+  code: CartQuoteIssueCode;
+  message: string;
+  expectedUnitPrice?: number;
+  currentUnitPrice?: number;
+}
+
+export interface CartQuoteLine {
+  itemId: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  itemName?: string;
+  vendorId?: string;
+}
+
+export interface CartQuoteResult {
+  items: CartQuoteLine[];
+  subtotal: number;
+  total: number;
+  canCheckout: boolean;
+  issues: CartQuoteIssue[];
+  /** Present only when `canCheckout` is true and there are no issues. */
+  quoteToken: string | null;
+  quoteExpiresAt: string | null;
+}
+
+export interface CheckoutInput {
+  checkoutGroupId: string;
+  items: { itemId: string; quantity: number }[];
+  quoteToken: string;
+  deliveryDate: string;
+  deliveryAddress: string;
+  message?: string;
+}
+
+export interface CheckoutSummary {
+  orderCount?: number;
+  subtotal?: number;
+  total?: number;
+  [key: string]: unknown;
+}
+
+export interface CheckoutResult {
+  checkoutGroupId: string;
+  orders: Order[];
+  summary: CheckoutSummary;
+  replayed: boolean;
 }
 
 export interface Transaction {

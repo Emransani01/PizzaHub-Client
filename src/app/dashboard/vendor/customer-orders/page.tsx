@@ -134,7 +134,10 @@ export default function VendorCustomerOrdersPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {data.items.map((order) => (
+          {data.items.map((order) => {
+            const quantity = order.quantity ?? 1;
+            const lineTotal = order.lineTotal ?? order.itemPrice * quantity;
+            return (
             <article
               key={order.id}
               className="rounded-[1.25rem] border border-brand-brown/10 bg-white p-5 shadow-[0_16px_40px_-40px_rgba(43,26,18,0.5)]"
@@ -158,7 +161,8 @@ export default function VendorCustomerOrdersPage() {
                       <OrderStatusBadge status={order.status} />
                     </div>
                     <p className="mt-1 text-xs text-brand-brown/55">
-                      {order.customerName} · {formatCurrency(order.itemPrice)}
+                      {order.customerName} · {formatCurrency(order.itemPrice)} ×{" "}
+                      {quantity} · Line total {formatCurrency(lineTotal)}
                     </p>
                     <p className="text-xs text-brand-brown/45">
                       Requested for {formatDate(order.deliveryDate)} · placed{" "}
@@ -238,7 +242,8 @@ export default function VendorCustomerOrdersPage() {
                 </div>
               </details>
             </article>
-          ))}
+            );
+          })}
 
           {data.totalPages > 1 ? (
             <div className="flex items-center justify-center gap-3 pt-2">

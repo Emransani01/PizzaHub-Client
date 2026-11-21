@@ -9,14 +9,22 @@ import {
   Crown,
   Heart,
   MapPin,
+  Minus,
+  Plus,
   ShieldAlert,
   Store,
 } from "lucide-react";
+import { AddToCartButton } from "@/components/menu/add-to-cart-button";
 import { OrderForm } from "@/components/menu/order-form";
 import { Footer } from "@/components/shared/footer";
 import { Navbar } from "@/components/shared/navbar";
 import { PrivateRoute } from "@/components/shared/private-route";
-import { FALLBACK_FOOD_IMAGE, MENU_STATUS_LABELS, ROUTES } from "@/constants";
+import {
+  CART_MAX_QUANTITY,
+  FALLBACK_FOOD_IMAGE,
+  MENU_STATUS_LABELS,
+  ROUTES,
+} from "@/constants";
 import { errorMessage } from "@/lib/api";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
@@ -33,6 +41,7 @@ export default function MenuItemPage() {
     toggleFavorite,
   } = useAuth();
   const [item, setItem] = useState<MenuItem | null>(null);
+  const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -228,8 +237,87 @@ export default function MenuItemPage() {
                     </p>
                   ) : null}
 
-                  <div id="order" className="mt-7 scroll-mt-24">
+                  <div id="order" className="mt-7 space-y-4 scroll-mt-24">
                     <OrderForm item={item} />
+                    <div className="rounded-[1.5rem] border border-brand-brown/10 bg-white p-6 shadow-[0_18px_40px_-32px_rgba(43,26,18,0.5)]">
+                      <h2 className="text-lg font-extrabold tracking-tight text-brand-brown">
+                        Add to your cart
+                      </h2>
+                      <p className="mt-1 text-sm leading-6 text-brand-brown/55">
+                        Choose a quantity, then review everything in your cart
+                        before placing a single checkout for multiple vendors.
+                      </p>
+
+                      <div className="mt-5 flex flex-wrap items-end gap-4">
+                        <div className="space-y-1.5">
+                          <label
+                            htmlFor="item-quantity"
+                            className="text-xs font-bold uppercase tracking-wide text-brand-brown/50"
+                          >
+                            Quantity
+                          </label>
+                          <div className="inline-flex items-center rounded-full border border-brand-brown/15 bg-cream/40 p-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setQuantity((value) => Math.max(1, value - 1))
+                              }
+                              disabled={quantity <= 1}
+                              aria-label="Decrease quantity"
+                              className="inline-flex size-8 items-center justify-center rounded-full text-brand-brown transition-colors hover:bg-white disabled:opacity-40"
+                            >
+                              <Minus aria-hidden="true" className="size-4" />
+                            </button>
+                            <input
+                              id="item-quantity"
+                              type="number"
+                              min={1}
+                              max={CART_MAX_QUANTITY}
+                              value={quantity}
+                              onChange={(event) => {
+                                const value = Number(event.target.value);
+                                setQuantity(
+                                  Number.isFinite(value)
+                                    ? Math.min(
+                                        CART_MAX_QUANTITY,
+                                        Math.max(1, Math.trunc(value)),
+                                      )
+                                    : 1,
+                                );
+                              }}
+                              className="w-12 border-0 bg-transparent text-center text-sm font-bold text-brand-brown outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setQuantity((value) =>
+                                  Math.min(CART_MAX_QUANTITY, value + 1),
+                                )
+                              }
+                              disabled={quantity >= CART_MAX_QUANTITY}
+                              aria-label="Increase quantity"
+                              className="inline-flex size-8 items-center justify-center rounded-full text-brand-brown transition-colors hover:bg-white disabled:opacity-40"
+                            >
+                              <Plus aria-hidden="true" className="size-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="min-w-[180px] flex-1">
+                          <AddToCartButton
+                            item={item}
+                            quantity={quantity}
+                            className="w-full justify-center"
+                          />
+                        </div>
+                      </div>
+
+                      <p className="mt-4 text-xs leading-5 text-brand-brown/50">
+                        {formatCurrency(item.price)} each ·{" "}
+                        {formatCurrency(item.price * quantity)} for this line.
+                        Final prices are confirmed before checkout.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

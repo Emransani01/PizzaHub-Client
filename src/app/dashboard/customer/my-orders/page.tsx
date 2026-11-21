@@ -32,6 +32,7 @@ type Filter = OrderStatus | "all";
 function MyOrdersContent() {
   const searchParams = useSearchParams();
   const highlight = searchParams.get("highlight");
+  const group = searchParams.get("group");
 
   const [filter, setFilter] = useState<Filter>("all");
   const [page, setPage] = useState(1);
@@ -161,13 +162,17 @@ function MyOrdersContent() {
           </div>
         ) : (
           <div className="space-y-4">
-            {data.items.map((order) => (
+            {data.items.map((order) => {
+              const quantity = order.quantity ?? 1;
+              const lineTotal = order.lineTotal ?? order.itemPrice * quantity;
+              return (
               <article
                 key={order.id}
                 id={`order-${order.id}`}
                 className={cn(
                   "rounded-[1.25rem] border bg-white p-5 transition-shadow",
-                  highlight === order.id
+                  highlight === order.id ||
+                    (group && order.checkoutGroupId === group)
                     ? "border-brand-red shadow-[0_0_0_3px_rgba(193,18,31,0.15)]"
                     : "border-brand-brown/10 shadow-[0_16px_40px_-40px_rgba(43,26,18,0.5)]",
                 )}
@@ -196,8 +201,17 @@ function MyOrdersContent() {
                         <OrderStatusBadge status={order.status} />
                       </div>
                       <p className="mt-1 text-xs text-brand-brown/55">
-                        {order.vendorName} · {formatCurrency(order.itemPrice)}
+                        {order.vendorName} · {formatCurrency(order.itemPrice)} ×{" "}
+                        {quantity} · Line total {formatCurrency(lineTotal)}
                       </p>
+                      {order.checkoutGroupId ? (
+                        <p className="mt-0.5 text-[11px] text-brand-brown/45">
+                          Checkout group:{" "}
+                          <span className="font-semibold">
+                            {order.checkoutGroupId}
+                          </span>
+                        </p>
+                      ) : null}
                       <p className="text-xs text-brand-brown/45">
                         Delivery requested for {formatDate(order.deliveryDate)} ·
                         placed {formatDateTime(order.createdAt)}
@@ -243,7 +257,8 @@ function MyOrdersContent() {
                   </div>
                 </details>
               </article>
-            ))}
+              );
+            })}
 
             {data.totalPages > 1 ? (
               <div className="flex items-center justify-center gap-3 pt-2">

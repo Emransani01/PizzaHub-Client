@@ -18,6 +18,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { ROUTES, ROLE_LABELS } from "@/constants";
 import { cn } from "@/lib/utils";
 import { roleHome, useAuth } from "@/providers/auth-provider";
+import { useCart } from "@/providers/cart-provider";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
 import { UserAvatar } from "./user-avatar";
@@ -29,7 +30,8 @@ const navLinks = [
 
 export function Navbar() {
   const pathname = usePathname();
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, signingOut } = useAuth();
+  const { count } = useCart();
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -110,13 +112,27 @@ export function Navbar() {
             </Link>
           ) : null}
 
-          <Link
-            href={ROUTES.cart}
-            aria-label="Cart"
-            className="group relative ml-0.5 inline-flex size-10 items-center justify-center rounded-full text-brand-brown transition-colors hover:bg-brand-red/10 hover:text-brand-red"
-          >
-            <ShoppingCart aria-hidden="true" className="size-5" />
-          </Link>
+          {user?.role !== "vendor" && user?.role !== "admin" ? (
+            <Link
+              href={ROUTES.cart}
+              aria-label={
+                count > 0
+                  ? `Cart, ${count} item${count === 1 ? "" : "s"}`
+                  : "Cart"
+              }
+              className="group relative ml-0.5 inline-flex size-10 items-center justify-center rounded-full text-brand-brown transition-colors hover:bg-brand-red/10 hover:text-brand-red"
+            >
+              <ShoppingCart aria-hidden="true" className="size-5" />
+              {count > 0 ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute -right-0.5 -top-0.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold leading-[18px] text-white shadow-sm"
+                >
+                  {count > 99 ? "99+" : count}
+                </span>
+              ) : null}
+            </Link>
+          ) : null}
 
           <ThemeToggle />
 
@@ -190,10 +206,12 @@ export function Navbar() {
                         setMenuOpen(false);
                         void signOut();
                       }}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-brand-red transition-colors hover:bg-brand-red/5"
+                      disabled={signingOut}
+                      aria-busy={signingOut}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-brand-red transition-colors hover:bg-brand-red/5 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <LogOut aria-hidden="true" className="size-4" />
-                      Sign out
+                      {signingOut ? "Signing out…" : "Sign out"}
                     </button>
                   </div>
                 </div>
@@ -258,14 +276,29 @@ export function Navbar() {
             ))}
             <div className="my-3 h-px bg-brand-brown/10" />
 
-            <Link
-              href={ROUTES.cart}
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 rounded-2xl px-4 py-3 text-base font-semibold text-brand-brown transition-colors hover:bg-brand-red/5"
-            >
-              <ShoppingCart aria-hidden="true" className="size-4" />
-              Cart
-            </Link>
+            {user?.role !== "vendor" && user?.role !== "admin" ? (
+              <Link
+                href={ROUTES.cart}
+                onClick={() => setOpen(false)}
+                aria-label={
+                  count > 0
+                    ? `Cart, ${count} item${count === 1 ? "" : "s"}`
+                    : "Cart"
+                }
+                className="flex items-center gap-2 rounded-2xl px-4 py-3 text-base font-semibold text-brand-brown transition-colors hover:bg-brand-red/5"
+              >
+                <ShoppingCart aria-hidden="true" className="size-4" />
+                Cart
+                {count > 0 ? (
+                  <span
+                    aria-hidden="true"
+                    className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-brand-red px-1.5 py-0.5 text-[11px] font-bold text-white"
+                  >
+                    {count}
+                  </span>
+                ) : null}
+              </Link>
+            ) : null}
             <div className="flex items-center justify-between rounded-2xl px-4 py-1.5 md:hidden">
               <span className="text-base font-semibold text-brand-brown">
                 Appearance
@@ -312,10 +345,12 @@ export function Navbar() {
                     setOpen(false);
                     void signOut();
                   }}
-                  className="flex items-center gap-2 rounded-2xl px-4 py-3 text-left text-base font-semibold text-brand-red transition-colors hover:bg-brand-red/5"
+                  disabled={signingOut}
+                  aria-busy={signingOut}
+                  className="flex items-center gap-2 rounded-2xl px-4 py-3 text-left text-base font-semibold text-brand-red transition-colors hover:bg-brand-red/5 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <LogOut aria-hidden="true" className="size-4" />
-                  Sign out
+                  {signingOut ? "Signing out…" : "Sign out"}
                 </button>
               </>
             ) : (

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, Crown, MapPin, Store, UtensilsCrossed } from "lucide-react";
+import { AddToCartButton } from "@/components/menu/add-to-cart-button";
 import { OrderButton } from "@/components/menu/order-button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { buttonVariants } from "@/components/ui/button";
@@ -115,13 +116,7 @@ export async function FeaturedMenu() {
                     </div>
                     <div className="flex items-center gap-2">
                       <OrderButton item={item} className="whitespace-nowrap px-3" />
-                      <Link
-                        href={ROUTES.menuItem(item.id)}
-                        aria-label={`View ${item.itemName}`}
-                        className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-red text-white transition-all hover:-translate-y-0.5 hover:bg-brand-red-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
-                      >
-                        <ArrowUpRight aria-hidden="true" className="size-4" />
-                      </Link>
+                      <AddToCartButton item={item} iconOnly />
                     </div>
                   </div>
                 </div>

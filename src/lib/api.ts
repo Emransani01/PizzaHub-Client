@@ -28,13 +28,29 @@ export class ApiError extends Error {
 }
 
 let accessToken: string | null = null;
-let refreshPromise: Promise<TokenResponse | null> | null = null;
+let refreshPromise: Promise<TokenRefreshResult> | null = null;
+
+const TOKEN_TIMEOUT_MS = 10_000;
+const TOKEN_UNAVAILABLE_MESSAGE =
+  "We couldn't verify your session. Check your connection and try again.";
+const TOKEN_BLOCKED_MESSAGE =
+  "This account has been blocked by an administrator.";
 
 export interface TokenResponse {
   token: string;
   expiresIn: string;
   user: UserProfile;
 }
+
+/**
+ * Explicit outcome of the session-cookie → JWT exchange. A temporary outage
+ * must never be collapsed into "signed out".
+ */
+export type TokenRefreshResult =
+  | { kind: "authenticated"; session: TokenResponse }
+  | { kind: "unauthenticated"; message: string }
+  | { kind: "forbidden"; message: string }
+  | { kind: "unavailable"; message: string };
 
 export function getAccessToken(): string | null {
   return accessToken;
@@ -48,29 +64,94 @@ export function setAccessToken(token: string | null): void {
   accessToken = token;
 }
 
-/** Exchanges the session cookie for a fresh JWT. Returns null when signed out. */
-export async function fetchToken(): Promise<TokenResponse | null> {
+function messageFromBody(body: unknown, fallback: string): string {
+  if (body && typeof body === "object") {
+    const message = (body as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim().length > 0) {
+      return message;
+    }
+  }
+  return fallback;
+}
+
+function isTokenResponse(value: unknown): value is TokenResponse {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<TokenResponse>;
+  if (
+    typeof candidate.token !== "string" ||
+    candidate.token.length === 0 ||
+    typeof candidate.expiresIn !== "string"
+  ) {
+    return false;
+  }
+  if (!candidate.user || typeof candidate.user !== "object") return false;
+  const user = candidate.user as Partial<UserProfile>;
+  return typeof user.id === "string" && typeof user.role === "string";
+}
+
+/**
+ * Exchanges the session cookie for a fresh JWT.
+ *
+ * Only a genuine 401/403 clears the local token. Network failures, timeouts,
+ * rate limiting and 5xx responses are reported as `unavailable` so a temporary
+ * outage can never look like a signed-out user. Concurrent callers share one
+ * in-flight request.
+ */
+export async function fetchToken(): Promise<TokenRefreshResult> {
   if (!refreshPromise) {
     refreshPromise = (async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), TOKEN_TIMEOUT_MS);
+
       try {
         const response = await fetch(`${API_BASE}/auth/token`, {
           credentials: "include",
           cache: "no-store",
           headers: { Accept: "application/json" },
+          signal: controller.signal,
         });
 
-        if (!response.ok) {
+        if (response.status === 401) {
           accessToken = null;
-          return null;
+          return { kind: "unauthenticated", message: "Sign in to continue." };
         }
 
-        const data = (await response.json()) as TokenResponse;
+        if (response.status === 403) {
+          accessToken = null;
+          const body = await parseBody(response);
+          return {
+            kind: "forbidden",
+            message: messageFromBody(body, TOKEN_BLOCKED_MESSAGE),
+          };
+        }
+
+        if (!response.ok || response.status === 408 || response.status === 429) {
+          const body = await parseBody(response);
+          return {
+            kind: "unavailable",
+            message: messageFromBody(body, TOKEN_UNAVAILABLE_MESSAGE),
+          };
+        }
+
+        const data: unknown = await response.json().catch(() => null);
+        if (!isTokenResponse(data)) {
+          return {
+            kind: "unavailable",
+            message: TOKEN_UNAVAILABLE_MESSAGE,
+          };
+        }
+
         accessToken = data.token;
-        return data;
+        return { kind: "authenticated", session: data };
       } catch {
-        accessToken = null;
-        return null;
+        // Network errors and AbortError (including our own timeout) are
+        // intentionally non-destructive: keep the current token and user.
+        return {
+          kind: "unavailable",
+          message: TOKEN_UNAVAILABLE_MESSAGE,
+        };
       } finally {
+        clearTimeout(timeout);
         refreshPromise = null;
       }
     })();
@@ -151,9 +232,18 @@ export async function apiFetch<T>(
 
   if (response.status === 401 && !options.noRetry) {
     const refreshed = await fetchToken();
-    if (refreshed) {
+
+    if (refreshed.kind === "authenticated") {
+      // Exactly one retry with the freshly issued bearer token.
       response = await send();
+    } else if (refreshed.kind === "forbidden") {
+      throw new ApiError(403, refreshed.message, { code: "FORBIDDEN" });
+    } else if (refreshed.kind === "unavailable") {
+      throw new ApiError(503, refreshed.message, {
+        code: "AUTH_UNAVAILABLE",
+      });
     }
+    // `unauthenticated` falls through so the original 401 is preserved.
   }
 
   if (response.status === 204) {

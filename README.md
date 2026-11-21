@@ -209,6 +209,7 @@ From `client/`:
 ```bash
 npx tsc --noEmit
 npm run lint
+npm test
 npm run build
 ```
 

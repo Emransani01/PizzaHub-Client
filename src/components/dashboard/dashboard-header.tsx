@@ -8,7 +8,7 @@ import { ROLE_LABELS, ROUTES } from "@/constants";
 import { useAuth } from "@/providers/auth-provider";
 
 export function DashboardHeader() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, signingOut } = useAuth();
   const firstName =
     user?.name
       .trim()
@@ -51,10 +51,12 @@ export function DashboardHeader() {
         <button
           type="button"
           onClick={() => void signOut()}
-          className="inline-flex items-center gap-1.5 rounded-full bg-brand-red px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-brand-red-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
+          disabled={signingOut}
+          aria-busy={signingOut}
+          className="inline-flex items-center gap-1.5 rounded-full bg-brand-red px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-brand-red-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red disabled:cursor-not-allowed disabled:opacity-60"
         >
           <LogOut aria-hidden="true" className="size-3.5" />
-          Sign out
+          {signingOut ? "Signing out…" : "Sign out"}
         </button>
       </div>
     </header>
