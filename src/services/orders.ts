@@ -56,10 +56,6 @@ export function listOrders(query: {
   return apiFetch<Paginated<Order>>(`/orders?${params.toString()}`);
 }
 
-export function getOrder(id: string): Promise<Order> {
-  return apiFetch<Order>(`/orders/${id}`);
-}
-
 export function updateOrderStatus(
   id: string,
   status: Extract<OrderStatus, "accepted" | "rejected" | "cancelled">,

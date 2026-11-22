@@ -15,8 +15,6 @@ import {
 import type { MenuItemStatus, OrderStatus, UserRole } from "@/types";
 
 export const APP_NAME = "PizzaHub";
-export const APP_DESCRIPTION =
-  "Order fresh pizza, manage your menu and track deliveries in one place.";
 
 export const ROUTES = {
   home: "/",
@@ -30,8 +28,6 @@ export const ROUTES = {
   cart: "/cart",
   checkout: "/checkout",
   profileSettings: "/profile-settings",
-  paymentSuccess: "/payment-success",
-  paymentCancel: "/payment-cancel",
   dashboard: "/dashboard",
   dashboardVendor: "/dashboard/vendor",
   vendorMyMenuItems: "/dashboard/vendor/my-menu-items",

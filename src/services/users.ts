@@ -1,10 +1,6 @@
 import { apiFetch } from "@/lib/api";
 import type { AdminUser, Paginated, UserProfile, UserRole } from "@/types";
 
-export function getMyProfile(): Promise<UserProfile> {
-  return apiFetch<UserProfile>("/users/me");
-}
-
 export function updateMyProfile(input: {
   name?: string;
   image?: string | null;

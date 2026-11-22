@@ -1,10 +1,5 @@
 import { apiFetch } from "@/lib/api";
-import type {
-  CategoryCount,
-  MenuItem,
-  MenuItemStatus,
-  Paginated,
-} from "@/types";
+import type { MenuItem, MenuItemStatus, Paginated } from "@/types";
 
 export interface MenuQuery {
   search?: string;
@@ -35,14 +30,6 @@ function toQueryString(query: MenuQuery & { status?: string; vendorId?: string }
 
 export function listMenuItems(query: MenuQuery = {}): Promise<Paginated<MenuItem>> {
   return apiFetch<Paginated<MenuItem>>(`/menu-items?${toQueryString(query)}`);
-}
-
-export function listFeaturedItems(): Promise<{ items: MenuItem[] }> {
-  return apiFetch<{ items: MenuItem[] }>("/menu-items/featured");
-}
-
-export function listCategoryCounts(): Promise<{ categories: CategoryCount[] }> {
-  return apiFetch<{ categories: CategoryCount[] }>("/menu-items/categories");
 }
 
 export function listLocations(): Promise<{ locations: string[] }> {
