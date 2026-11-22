@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Loader2, Lock, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
+import { AuthStateNotice } from "@/components/shared/auth-state-notice";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants";
 import { errorMessage } from "@/lib/api";
@@ -15,7 +16,7 @@ import type { MenuItem } from "@/types";
 
 export function OrderForm({ item }: { item: MenuItem }) {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading, authError, refreshing, refresh } = useAuth();
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [message, setMessage] = useState("");
@@ -25,6 +26,16 @@ export function OrderForm({ item }: { item: MenuItem }) {
   if (loading) {
     return (
       <div className="h-64 animate-pulse rounded-[1.5rem] bg-brand-brown/10" />
+    );
+  }
+
+  if (!user && authError) {
+    return (
+      <AuthStateNotice
+        error={authError}
+        refreshing={refreshing}
+        onRetry={() => void refresh()}
+      />
     );
   }
 

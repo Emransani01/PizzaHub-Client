@@ -28,7 +28,16 @@ export class ApiError extends Error {
 }
 
 let accessToken: string | null = null;
-let refreshPromise: Promise<TokenRefreshResult> | null = null;
+/**
+ * Incrementing this epoch invalidates every token exchange that started before
+ * the change. A late response must not write a token or clear a newer session.
+ */
+let authEpoch = 0;
+interface RefreshOperation {
+  epoch: number;
+  promise: Promise<TokenRefreshResult>;
+}
+let refreshOperation: RefreshOperation | null = null;
 
 const TOKEN_TIMEOUT_MS = 10_000;
 const TOKEN_UNAVAILABLE_MESSAGE =
@@ -46,11 +55,20 @@ export interface TokenResponse {
  * Explicit outcome of the session-cookie → JWT exchange. A temporary outage
  * must never be collapsed into "signed out".
  */
-export type TokenRefreshResult =
+export type TokenRefreshResult = (
   | { kind: "authenticated"; session: TokenResponse }
-  | { kind: "unauthenticated"; message: string }
+  | {
+      kind: "unauthenticated";
+      message: string;
+      /** A session cookie existed but no longer maps to a valid session. */
+      sessionExpired?: boolean;
+    }
   | { kind: "forbidden"; message: string }
-  | { kind: "unavailable"; message: string };
+  | { kind: "unavailable"; message: string }
+) & {
+  /** Epoch of the session that initiated this exchange. */
+  epoch?: number;
+};
 
 export function getAccessToken(): string | null {
   return accessToken;
@@ -62,6 +80,29 @@ export function clearAccessToken(): void {
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;
+}
+
+export function getAuthEpoch(): number {
+  return authEpoch;
+}
+
+/** Invalidates pre-change refreshes before a new cookie is established. */
+export function beginAuthSessionChange(): number {
+  authEpoch += 1;
+  refreshOperation = null;
+  return authEpoch;
+}
+
+/** Invalidates anything started during the change and clears the old token. */
+export function completeAuthSessionChange(): number {
+  authEpoch += 1;
+  accessToken = null;
+  refreshOperation = null;
+  return authEpoch;
+}
+
+export function isStaleTokenResult(result: TokenRefreshResult): boolean {
+  return result.epoch !== undefined && result.epoch !== authEpoch;
 }
 
 function messageFromBody(body: unknown, fallback: string): string {
@@ -98,66 +139,95 @@ function isTokenResponse(value: unknown): value is TokenResponse {
  * in-flight request.
  */
 export async function fetchToken(): Promise<TokenRefreshResult> {
-  if (!refreshPromise) {
-    refreshPromise = (async () => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), TOKEN_TIMEOUT_MS);
-
-      try {
-        const response = await fetch(`${API_BASE}/auth/token`, {
-          credentials: "include",
-          cache: "no-store",
-          headers: { Accept: "application/json" },
-          signal: controller.signal,
-        });
-
-        if (response.status === 401) {
-          accessToken = null;
-          return { kind: "unauthenticated", message: "Sign in to continue." };
-        }
-
-        if (response.status === 403) {
-          accessToken = null;
-          const body = await parseBody(response);
-          return {
-            kind: "forbidden",
-            message: messageFromBody(body, TOKEN_BLOCKED_MESSAGE),
-          };
-        }
-
-        if (!response.ok || response.status === 408 || response.status === 429) {
-          const body = await parseBody(response);
-          return {
-            kind: "unavailable",
-            message: messageFromBody(body, TOKEN_UNAVAILABLE_MESSAGE),
-          };
-        }
-
-        const data: unknown = await response.json().catch(() => null);
-        if (!isTokenResponse(data)) {
-          return {
-            kind: "unavailable",
-            message: TOKEN_UNAVAILABLE_MESSAGE,
-          };
-        }
-
-        accessToken = data.token;
-        return { kind: "authenticated", session: data };
-      } catch {
-        // Network errors and AbortError (including our own timeout) are
-        // intentionally non-destructive: keep the current token and user.
-        return {
-          kind: "unavailable",
-          message: TOKEN_UNAVAILABLE_MESSAGE,
-        };
-      } finally {
-        clearTimeout(timeout);
-        refreshPromise = null;
+  if (!refreshOperation) {
+    const epoch = authEpoch;
+    const promise = runTokenRefresh(epoch);
+    refreshOperation = { epoch, promise };
+    void promise.finally(() => {
+      // A session change may have detached this operation and started a new
+      // one; never clear the newer shared promise from an older request.
+      if (refreshOperation?.promise === promise) {
+        refreshOperation = null;
       }
-    })();
+    });
   }
 
-  return refreshPromise;
+  return refreshOperation.promise;
+}
+
+async function runTokenRefresh(epoch: number): Promise<TokenRefreshResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TOKEN_TIMEOUT_MS);
+  const isCurrent = () => epoch === authEpoch;
+  const writeToken = (token: string | null) => {
+    // A response that belongs to a replaced session must not touch the token.
+    if (isCurrent()) accessToken = token;
+  };
+
+  try {
+    const response = await fetch(`${API_BASE}/auth/token`, {
+      credentials: "include",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    });
+
+    if (response.status === 401) {
+      writeToken(null);
+      const body = await parseBody(response);
+      const sessionExpired =
+        Boolean(body) &&
+        typeof body === "object" &&
+        (body as { code?: unknown }).code === "SESSION_EXPIRED";
+      return {
+        kind: "unauthenticated",
+        message: messageFromBody(body, "Sign in to continue."),
+        ...(sessionExpired ? { sessionExpired: true } : {}),
+        epoch,
+      };
+    }
+
+    if (response.status === 403) {
+      writeToken(null);
+      const body = await parseBody(response);
+      return {
+        kind: "forbidden",
+        message: messageFromBody(body, TOKEN_BLOCKED_MESSAGE),
+        epoch,
+      };
+    }
+
+    if (!response.ok || response.status === 408 || response.status === 429) {
+      const body = await parseBody(response);
+      return {
+        kind: "unavailable",
+        message: messageFromBody(body, TOKEN_UNAVAILABLE_MESSAGE),
+        epoch,
+      };
+    }
+
+    const data: unknown = await response.json().catch(() => null);
+    if (!isTokenResponse(data)) {
+      return {
+        kind: "unavailable",
+        message: TOKEN_UNAVAILABLE_MESSAGE,
+        epoch,
+      };
+    }
+
+    writeToken(data.token);
+    return { kind: "authenticated", session: data, epoch };
+  } catch {
+    // Network errors and AbortError (including our own timeout) are
+    // intentionally non-destructive: keep the current token and user.
+    return {
+      kind: "unavailable",
+      message: TOKEN_UNAVAILABLE_MESSAGE,
+      epoch,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function parseBody(response: Response): Promise<unknown> {
@@ -233,7 +303,10 @@ export async function apiFetch<T>(
   if (response.status === 401 && !options.noRetry) {
     const refreshed = await fetchToken();
 
-    if (refreshed.kind === "authenticated") {
+    if (isStaleTokenResult(refreshed)) {
+      // A newer session was established while this exchange was in flight.
+      // Preserve the original 401 instead of retrying with no/old bearer token.
+    } else if (refreshed.kind === "authenticated") {
       // Exactly one retry with the freshly issued bearer token.
       response = await send();
     } else if (refreshed.kind === "forbidden") {

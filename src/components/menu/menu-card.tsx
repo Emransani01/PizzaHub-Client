@@ -23,6 +23,7 @@ export function MenuCard({ item }: MenuCardProps) {
       <div className="relative aspect-[4/3] overflow-hidden bg-cream-deep">
         <Link
           href={ROUTES.menuItem(item.id)}
+          prefetch={false}
           aria-label={item.itemName}
           className="absolute inset-0 block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
         >
@@ -71,7 +72,9 @@ export function MenuCard({ item }: MenuCardProps) {
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start justify-between gap-3">
           <h3 className="text-base font-extrabold tracking-tight text-brand-brown transition-colors group-hover:text-brand-red">
-            <Link href={ROUTES.menuItem(item.id)}>{item.itemName}</Link>
+            <Link href={ROUTES.menuItem(item.id)} prefetch={false}>
+              {item.itemName}
+            </Link>
           </h3>
           <span className="shrink-0 text-base font-extrabold text-brand-red">
             {formatCurrency(item.price)}

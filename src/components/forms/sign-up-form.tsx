@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Camera, Loader2, Store, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { ROUTES } from "@/constants";
 import { errorMessage, isApiError } from "@/lib/api";
 import { authClient } from "@/lib/auth-client";
+import { hardNavigate } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { getPublicConfig } from "@/services/config";
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,8 @@ import type { UserRole } from "@/types";
 type SignUpRole = Extract<UserRole, "customer" | "vendor">;
 
 export function SignUpForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const { refresh } = useAuth();
+  const { refreshSession, beginSessionChange, completeSessionChange } = useAuth();
 
   const initialRole: SignUpRole =
     searchParams.get("role") === "vendor" ? "vendor" : "customer";
@@ -34,6 +34,8 @@ export function SignUpForm() {
   const [role, setRole] = useState<SignUpRole>(initialRole);
   const [businessName, setBusinessName] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [needsVerificationRetry, setNeedsVerificationRetry] = useState(false);
   const [googleStatus, setGoogleStatus] = useState<"loading" | "ready" | "error">(
     "loading",
   );
@@ -94,6 +96,43 @@ export function SignUpForm() {
     setProfilePreview(URL.createObjectURL(file));
   }
 
+  async function verifyAndContinue() {
+    setVerifying(true);
+    try {
+      const result = await refreshSession();
+
+      if (result.kind === "unavailable") {
+        setNeedsVerificationRetry(true);
+        setError(
+          `${result.message} Your account is ready. Retry the session check instead of signing in again.`,
+        );
+        return;
+      }
+      if (result.kind === "forbidden") {
+        setNeedsVerificationRetry(false);
+        setError(result.message);
+        return;
+      }
+      if (result.kind !== "authenticated") {
+        setNeedsVerificationRetry(false);
+        setError(
+          "Your account was created, but the session could not be confirmed. Please sign in.",
+        );
+        return;
+      }
+
+      setNeedsVerificationRetry(false);
+      setError(null);
+      toast.success("Your PizzaHub account is ready.");
+      const user = result.session.user;
+      hardNavigate(
+        user.roleOnboarded ? roleHome(user.role) : ROUTES.chooseRole,
+      );
+    } finally {
+      setVerifying(false);
+    }
+  }
+
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -119,6 +158,8 @@ export function SignUpForm() {
 
     setSubmitting(true);
     try {
+      await beginSessionChange();
+
       const result = await authClient.signUp.email({
         name: name.trim(),
         email: email.trim(),
@@ -132,6 +173,8 @@ export function SignUpForm() {
         );
         return;
       }
+
+      completeSessionChange();
 
       // The account is always created as a customer by Better Auth. The role is
       // applied here through the API, which rejects "admin" and can only run
@@ -165,21 +208,7 @@ export function SignUpForm() {
         }
       }
 
-      const user = await refresh();
-
-      toast.success("Your PizzaHub account is ready.");
-
-      if (!user) {
-        router.replace(ROUTES.signIn);
-        return;
-      }
-
-      if (!user.roleOnboarded) {
-        router.replace(ROUTES.chooseRole);
-        return;
-      }
-
-      router.replace(roleHome(user.role));
+      await verifyAndContinue();
     } catch (cause) {
       const message = errorMessage(cause);
       setError(message);
@@ -424,11 +453,27 @@ export function SignUpForm() {
         </p>
       ) : null}
 
+      {needsVerificationRetry ? (
+        <Button
+          type="button"
+          variant="brandOutline"
+          size="cta-md"
+          onClick={() => void verifyAndContinue()}
+          disabled={verifying || submitting}
+          className="mt-3 w-full"
+        >
+          {verifying ? (
+            <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+          ) : null}
+          Retry session check
+        </Button>
+      ) : null}
+
       <Button
         type="submit"
         variant="brand"
         size="cta-md"
-        disabled={submitting}
+        disabled={submitting || needsVerificationRetry}
         className="mt-5 w-full"
       >
         {submitting ? (

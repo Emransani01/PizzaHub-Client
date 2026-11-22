@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Ban, ShoppingBag } from "lucide-react";
+import { AuthStateNotice } from "@/components/shared/auth-state-notice";
 import { buttonVariants } from "@/components/ui/button";
 import { ROUTES } from "@/constants";
 import { safeNextPath } from "@/lib/navigation";
@@ -19,7 +20,7 @@ interface OrderButtonProps {
  * creates an order itself; it only links to the detail page's `#order` section.
  */
 export function OrderButton({ item, className }: OrderButtonProps) {
-  const { user, loading } = useAuth();
+  const { user, loading, authError, refreshing, refresh } = useAuth();
 
   // Public listings are already filtered, but stay defensive so an
   // unavailable or unapproved item can never expose an order action.
@@ -35,6 +36,16 @@ export function OrderButton({ item, className }: OrderButtonProps) {
           "inline-flex h-10 animate-pulse items-center justify-center rounded-full bg-brand-brown/10",
           className,
         )}
+      />
+    );
+  }
+
+  if (!user && authError) {
+    return (
+      <AuthStateNotice
+        error={authError}
+        refreshing={refreshing}
+        onRetry={() => void refresh()}
       />
     );
   }

@@ -23,6 +23,7 @@ export function AuthAccessError({
   onRetry,
 }: AuthAccessErrorProps) {
   const blocked = error.kind === "forbidden";
+  const expired = error.kind === "sessionExpired";
 
   return (
     <div
@@ -36,15 +37,26 @@ export function AuthAccessError({
           className="mx-auto size-7 text-brand-red"
         />
         <h1 className="mt-3 text-lg font-bold text-brand-brown">
-          {blocked ? "Account access blocked" : "Session check unavailable"}
+          {blocked
+            ? "Account access blocked"
+            : expired
+              ? "Session expired"
+              : "Session check unavailable"}
         </h1>
         <p className="mt-2 text-sm leading-6 text-brand-brown/70">
           {error.message}
         </p>
 
         <div className="mt-5 flex justify-center">
-          {blocked ? (
-            <Link href={ROUTES.signIn} className={buttonVariants({ variant: "brand", size: "cta-md" })}>
+          {blocked || expired ? (
+            <Link
+              href={
+                expired
+                  ? `${ROUTES.signIn}?reason=session-expired`
+                  : ROUTES.signIn
+              }
+              className={buttonVariants({ variant: "brand", size: "cta-md" })}
+            >
               Back to sign in
             </Link>
           ) : (

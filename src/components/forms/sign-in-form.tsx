@@ -2,24 +2,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2, LogIn, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { inputClass } from "@/components/ui/form-field";
 import { ROUTES } from "@/constants";
 import { authClient } from "@/lib/auth-client";
-import { safeNextPath } from "@/lib/navigation";
+import { hardNavigate, safeNextPath } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { getPublicConfig } from "@/services/config";
 import { roleHome, useAuth } from "@/providers/auth-provider";
 
 export function SignInForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const { refresh } = useAuth();
+  const { refreshSession, beginSessionChange, completeSessionChange } = useAuth();
 
   const nextParam = searchParams.get("next");
+  const sessionExpired = searchParams.get("reason") === "session-expired";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,16 +46,33 @@ export function SignInForm() {
     void loadGoogleConfig();
   }, [loadGoogleConfig]);
 
-  async function finishSignIn() {
-    const user = await refresh();
+  useEffect(() => {
+    if (sessionExpired) {
+      setError("Your session has expired. Please sign in again.");
+    }
+  }, [sessionExpired]);
 
-    if (!user) {
+  async function finishSignIn() {
+    const result = await refreshSession();
+
+    if (result.kind === "unavailable") {
+      setError(
+        `${result.message} Your credentials were accepted, but we couldn't confirm the session. Try signing in again.`,
+      );
+      return;
+    }
+    if (result.kind === "forbidden") {
+      setError(result.message);
+      return;
+    }
+    if (result.kind !== "authenticated") {
       setError(
         "Your session could not be confirmed. Please try signing in again.",
       );
       return;
     }
 
+    const user = result.session.user;
     if (user.isBlocked) {
       setError("This account has been blocked by an administrator.");
       return;
@@ -63,14 +80,16 @@ export function SignInForm() {
 
     toast.success(`Welcome back, ${user.name.split(" ")[0]}.`);
 
-    if (!user.roleOnboarded) {
-      router.replace(ROUTES.chooseRole);
-      return;
-    }
+    const destination = !user.roleOnboarded
+      ? ROUTES.chooseRole
+      : safeNextPath(
+          nextParam,
+          user.role === "customer" ? ROUTES.home : roleHome(user.role),
+        );
 
-    const fallback =
-      user.role === "customer" ? ROUTES.home : roleHome(user.role);
-    router.replace(safeNextPath(nextParam, fallback));
+    // A signed-out prefetch of a protected route can be cached by the router.
+    // A full document request re-runs the proxy with the new cookie.
+    hardNavigate(destination);
   }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -84,6 +103,10 @@ export function SignInForm() {
 
     setSubmitting(true);
     try {
+      // Invalidate pre-login refreshes and let any older cookie cleanup finish
+      // before Better Auth writes the new session cookie.
+      await beginSessionChange();
+
       const result = await authClient.signIn.email({
         email: email.trim(),
         password,
@@ -94,6 +117,7 @@ export function SignInForm() {
         return;
       }
 
+      completeSessionChange();
       await finishSignIn();
     } catch (cause) {
       setError(

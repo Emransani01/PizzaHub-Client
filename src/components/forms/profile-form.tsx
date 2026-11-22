@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Camera, Check, Loader2, Store } from "lucide-react";
 import { toast } from "sonner";
+import { AuthStateNotice } from "@/components/shared/auth-state-notice";
 import { ROLE_LABELS } from "@/constants";
 import { errorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
@@ -15,7 +16,7 @@ import { uploadProfileImage } from "@/services/uploads";
 import { updateMyProfile } from "@/services/users";
 
 export function ProfileForm() {
-  const { user, loading, setUser } = useAuth();
+  const { user, loading, authError, refreshing, refresh, setUser } = useAuth();
 
   const [name, setName] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -92,6 +93,16 @@ export function ProfileForm() {
   if (loading) {
     return (
       <div className="h-96 animate-pulse rounded-[1.5rem] bg-brand-brown/10" />
+    );
+  }
+
+  if (!user && authError) {
+    return (
+      <AuthStateNotice
+        error={authError}
+        refreshing={refreshing}
+        onRetry={() => void refresh()}
+      />
     );
   }
 

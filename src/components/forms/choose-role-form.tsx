@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Loader2, Store, UserRound } from "lucide-react";
 import { toast } from "sonner";
+import { AuthStateNotice } from "@/components/shared/auth-state-notice";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants";
 import { errorMessage } from "@/lib/api";
+import { hardNavigate } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { roleHome, useAuth } from "@/providers/auth-provider";
 import { completeRole, updateMyProfile } from "@/services/users";
@@ -15,28 +16,66 @@ import type { UserRole } from "@/types";
 type OnboardingRole = Extract<UserRole, "customer" | "vendor">;
 
 export function ChooseRoleForm() {
-  const router = useRouter();
-  const { user, loading, refresh } = useAuth();
+  const { user, loading, authError, refreshing, refresh, refreshSession } =
+    useAuth();
 
   const [role, setRole] = useState<OnboardingRole>("customer");
   const [businessName, setBusinessName] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [verifyingRole, setVerifyingRole] = useState(false);
+  const [savedRole, setSavedRole] = useState<OnboardingRole | null>(null);
+  const [needsSessionRetry, setNeedsSessionRetry] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading) return;
+    // A temporary verification failure must show a recovery state, not bounce
+    // the user to Sign In as though they were unauthenticated.
+    if (!user && authError) return;
     if (!user) {
-      router.replace(ROUTES.signIn);
+      hardNavigate(ROUTES.signIn);
       return;
     }
     if (user.roleOnboarded) {
-      router.replace(roleHome(user.role));
+      hardNavigate(roleHome(user.role));
     }
-  }, [loading, router, user]);
+  }, [authError, loading, user]);
+
+  /** Verifies the already-saved role without repeating the role change. */
+  async function verifySavedRole() {
+    setVerifyingRole(true);
+    setError(null);
+    try {
+      const verified = await refreshSession();
+      if (verified.kind === "unavailable") {
+        setNeedsSessionRetry(true);
+        setError(
+          `${verified.message} Your account type was saved. Retry the session check below to continue.`,
+        );
+        return;
+      }
+      if (verified.kind !== "authenticated") {
+        setNeedsSessionRetry(false);
+        setError(
+          "Your account type was saved, but the session could not be confirmed. Please sign in.",
+        );
+        return;
+      }
+
+      setNeedsSessionRetry(false);
+      toast.success("Your account type is set. Welcome aboard.");
+      hardNavigate(roleHome(verified.session.user.role ?? savedRole ?? role));
+    } finally {
+      setVerifyingRole(false);
+    }
+  }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+
+    // The role change is one-shot; once saved, only session verification may retry.
+    if (savedRole || submitting || verifyingRole) return;
 
     if (role === "vendor" && businessName.trim().length < 2) {
       setError("Enter your business name to continue as a vendor.");
@@ -45,19 +84,19 @@ export function ChooseRoleForm() {
 
     setSubmitting(true);
     try {
-      let updated = await completeRole(role);
+      await completeRole(role);
+      setSavedRole(role);
+      setNeedsSessionRetry(false);
 
       if (role === "vendor" && businessName.trim()) {
         try {
-          updated = await updateMyProfile({ businessName: businessName.trim() });
+          await updateMyProfile({ businessName: businessName.trim() });
         } catch {
           // A missing business name can be fixed later in profile settings.
         }
       }
 
-      await refresh();
-      toast.success("Your account type is set. Welcome aboard.");
-      router.replace(roleHome(updated.role));
+      await verifySavedRole();
     } catch (cause) {
       const message = errorMessage(cause);
       setError(message);
@@ -67,7 +106,23 @@ export function ChooseRoleForm() {
     }
   }
 
-  if (loading || !user) {
+  if (loading) {
+    return (
+      <div className="h-[360px] animate-pulse rounded-[1.5rem] bg-brand-brown/10" />
+    );
+  }
+
+  if (!user && authError) {
+    return (
+      <AuthStateNotice
+        error={authError}
+        refreshing={refreshing}
+        onRetry={() => void refresh()}
+      />
+    );
+  }
+
+  if (!user) {
     return (
       <div className="h-[360px] animate-pulse rounded-[1.5rem] bg-brand-brown/10" />
     );
@@ -115,6 +170,7 @@ export function ChooseRoleForm() {
                 type="button"
                 onClick={() => setRole(option.value)}
                 aria-pressed={active}
+                disabled={Boolean(savedRole)}
                 className={cn(
                   "flex items-start gap-3 rounded-2xl border p-4 text-left transition-colors",
                   active
@@ -158,6 +214,7 @@ export function ChooseRoleForm() {
             id="choose-role-business"
             type="text"
             required
+            disabled={Boolean(savedRole)}
             value={businessName}
             onChange={(event) => setBusinessName(event.target.value)}
             placeholder="e.g. Napoli Slice House"
@@ -175,18 +232,36 @@ export function ChooseRoleForm() {
         </p>
       ) : null}
 
-      <Button
-        type="submit"
-        variant="brand"
-        size="cta-md"
-        disabled={submitting}
-        className="mt-5 w-full"
-      >
-        {submitting ? (
-          <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-        ) : null}
-        {submitting ? "Saving…" : "Continue to my dashboard"}
-      </Button>
+      {needsSessionRetry ? (
+        <Button
+          type="button"
+          variant="brandOutline"
+          size="cta-md"
+          onClick={() => void verifySavedRole()}
+          disabled={verifyingRole || submitting}
+          className="mt-3 w-full"
+        >
+          {verifyingRole ? (
+            <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+          ) : null}
+          Retry session check
+        </Button>
+      ) : null}
+
+      {savedRole ? null : (
+        <Button
+          type="submit"
+          variant="brand"
+          size="cta-md"
+          disabled={submitting}
+          className="mt-5 w-full"
+        >
+          {submitting ? (
+            <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+          ) : null}
+          {submitting ? "Saving…" : "Continue to my dashboard"}
+        </Button>
+      )}
     </form>
   );
 }

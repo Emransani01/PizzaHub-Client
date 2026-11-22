@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Ban, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
+import { AuthStateNotice } from "@/components/shared/auth-state-notice";
 import { buttonVariants } from "@/components/ui/button";
 import { ROUTES } from "@/constants";
 import { cartItemFromMenuItem } from "@/lib/cart-storage";
@@ -31,7 +32,7 @@ export function AddToCartButton({
   className,
   iconOnly = false,
 }: AddToCartButtonProps) {
-  const { user, loading } = useAuth();
+  const { user, loading, authError, refreshing, refresh } = useAuth();
   const { add, quantityOf } = useCart();
 
   // Public listings are already filtered, but stay defensive so an
@@ -51,6 +52,16 @@ export function AddToCartButton({
             : "inline-flex h-10 animate-pulse items-center justify-center rounded-full bg-brand-brown/10",
           className,
         )}
+      />
+    );
+  }
+
+  if (!user && authError) {
+    return (
+      <AuthStateNotice
+        error={authError}
+        refreshing={refreshing}
+        onRetry={() => void refresh()}
       />
     );
   }

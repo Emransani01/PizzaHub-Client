@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  beginAuthSessionChange,
   clearAccessToken,
+  completeAuthSessionChange,
   fetchToken,
   getAccessToken,
+  getAuthEpoch,
+  isStaleTokenResult,
   setAccessToken,
   type TokenRefreshResult,
 } from "@/lib/api";
@@ -20,6 +24,7 @@ function stubFetch(handler: (init?: RequestInit) => Promise<Response>) {
 
 describe("fetchToken classification", () => {
   beforeEach(() => {
+    completeAuthSessionChange();
     setAccessToken("old-token");
   });
 
@@ -50,6 +55,24 @@ describe("fetchToken classification", () => {
     expect(result).toMatchObject({
       kind: "unauthenticated",
       message: "Sign in to continue.",
+    });
+    expect(getAccessToken()).toBeNull();
+  });
+
+  it("marks a 401 with SESSION_EXPIRED as a stale session", async () => {
+    stubFetch(async () =>
+      jsonResponse(401, {
+        message: "Your session has expired. Please sign in again.",
+        code: "SESSION_EXPIRED",
+      }),
+    );
+
+    const result = await fetchToken();
+
+    expect(result).toMatchObject({
+      kind: "unauthenticated",
+      sessionExpired: true,
+      message: "Your session has expired. Please sign in again.",
     });
     expect(getAccessToken()).toBeNull();
   });
@@ -143,5 +166,33 @@ describe("fetchToken classification", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(first.kind).toBe("authenticated");
     expect(second.kind).toBe("authenticated");
+  });
+
+  it("does not write a token from a refresh invalidated by a session change", async () => {
+    let resolveResponse!: (response: Response) => void;
+    const pendingResponse = new Promise<Response>((resolve) => {
+      resolveResponse = resolve;
+    });
+    stubFetch(async () => pendingResponse);
+
+    const pending = fetchToken();
+    beginAuthSessionChange();
+    resolveResponse(jsonResponse(200, validBody));
+
+    const result = await pending;
+    expect(isStaleTokenResult(result)).toBe(true);
+    expect(getAccessToken()).toBe("old-token");
+  });
+
+  it("does not mark concurrent valid refresh results as stale", async () => {
+    stubFetch(async () => jsonResponse(200, validBody));
+    const epoch = getAuthEpoch();
+
+    const [first, second] = await Promise.all([fetchToken(), fetchToken()]);
+
+    expect(first.epoch).toBe(epoch);
+    expect(second.epoch).toBe(epoch);
+    expect(isStaleTokenResult(first)).toBe(false);
+    expect(isStaleTokenResult(second)).toBe(false);
   });
 });

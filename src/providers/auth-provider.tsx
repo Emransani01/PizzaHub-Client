@@ -13,7 +13,15 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
-import { clearAccessToken, errorMessage, fetchToken } from "@/lib/api";
+import {
+  beginAuthSessionChange,
+  completeAuthSessionChange,
+  errorMessage,
+  fetchToken,
+  getAuthEpoch,
+  isStaleTokenResult,
+  type TokenRefreshResult,
+} from "@/lib/api";
 import {
   addFavorite,
   listFavorites,
@@ -23,18 +31,39 @@ import type { UserProfile } from "@/types";
 
 /** Non-destructive auth failures that protected routes need to distinguish. */
 export interface AuthError {
-  kind: "forbidden" | "unavailable";
+  kind: "forbidden" | "unavailable" | "sessionExpired";
   message: string;
 }
 
+/**
+ * Explicit session state so the UI never treats a temporary verification
+ * failure as a genuine sign-out.
+ */
+export type SessionState =
+  | "loading"
+  | "authenticated"
+  | "signedOut"
+  | "unavailable";
+
 interface AuthContextValue {
   user: UserProfile | null;
+  sessionState: SessionState;
   loading: boolean;
   refreshing: boolean;
   authError: AuthError | null;
   favoriteIds: string[];
   /** Existing retry entry point; the auth-error panel calls this directly. */
   refresh: () => Promise<UserProfile | null>;
+  /** Full classified result, used by recovery flows that need to retry safely. */
+  refreshSession: () => Promise<TokenRefreshResult>;
+  /**
+   * Called before Better Auth establishes a new session. Waits for any older
+   * stale-cookie cleanup so its cookie-expiring response cannot land after the
+   * new cookie is set.
+   */
+  beginSessionChange: () => Promise<void>;
+  /** Called after a new session is confirmed, or after a confirmed sign-out. */
+  completeSessionChange: () => void;
   setUser: (user: UserProfile | null) => void;
   signOut: () => Promise<void>;
   signingOut: boolean;
@@ -52,10 +81,15 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const SIGN_OUT_ERROR_MESSAGE =
   "We couldn't sign you out. Check your connection and try again.";
+const SESSION_EXPIRED_MESSAGE =
+  "Your session has expired. Please sign in again.";
+const STALE_CLEANUP_FAILED_MESSAGE =
+  "We couldn't clear the old session automatically. Reload the page if sign-in sends you back here.";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [sessionState, setSessionState] = useState<SessionState>("loading");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -64,6 +98,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState<AuthError | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const mounted = useRef(true);
+  /**
+   * A sign-out invalidates every refresh that started before it. Without this,
+   * an in-flight token exchange could restore the user after logout.
+   */
+  const sessionGeneration = useRef(0);
+  /**
+   * One cleanup per auth epoch. Concurrent stale 401s share the same Better
+   * Auth sign-out instead of racing multiple cookie-expiring responses.
+   */
+  const staleCleanup = useRef<{
+    epoch: number;
+    promise: Promise<void>;
+  } | null>(null);
 
   useEffect(() => {
     mounted.current = true;
@@ -72,42 +119,139 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const refresh = useCallback(async () => {
+  /** Best-effort removal of a stale HttpOnly session cookie after a 401. */
+  const clearStaleSessionCookie = useCallback(async (epoch: number) => {
+    // Never sign out on behalf of a result from a replaced session.
+    if (epoch !== getAuthEpoch()) return;
+
+    const pending = staleCleanup.current;
+    if (pending?.epoch === epoch) return pending.promise;
+
+    const operation = (async () => {
+      const reportFailure = (detail?: string) => {
+        if (!mounted.current || epoch !== getAuthEpoch()) return;
+        const message = detail ?? STALE_CLEANUP_FAILED_MESSAGE;
+        setAuthError({
+          kind: "sessionExpired",
+          message: `${SESSION_EXPIRED_MESSAGE} ${message}`,
+        });
+        toast.error(STALE_CLEANUP_FAILED_MESSAGE);
+      };
+
+      try {
+        // Better Auth resolves with `{ data, error }`; it may not throw.
+        const result = await authClient.signOut();
+        if (result?.error || !result?.data?.success) {
+          const detail =
+            typeof result?.error?.message === "string" &&
+            result.error.message.trim().length > 0
+              ? `${STALE_CLEANUP_FAILED_MESSAGE} (${result.error.message})`
+              : STALE_CLEANUP_FAILED_MESSAGE;
+          reportFailure(detail);
+        }
+      } catch {
+        reportFailure();
+      }
+    })();
+
+    staleCleanup.current = { epoch, promise: operation };
+    void operation.finally(() => {
+      if (staleCleanup.current?.promise === operation) {
+        staleCleanup.current = null;
+      }
+    });
+
+    return operation;
+  }, []);
+
+  const beginSessionChange = useCallback(async () => {
+    // Capture first: an old cleanup's response carries a Set-Cookie that must
+    // finish before a newly issued session cookie can be stored by the browser.
+    const pendingCleanup = staleCleanup.current?.promise;
+    sessionGeneration.current += 1;
+    beginAuthSessionChange();
+    if (pendingCleanup) await pendingCleanup;
+  }, []);
+
+  const completeSessionChange = useCallback(() => {
+    sessionGeneration.current += 1;
+    completeAuthSessionChange();
+    if (mounted.current) setRefreshing(false);
+  }, []);
+
+  const refreshSession = useCallback(async (): Promise<TokenRefreshResult> => {
+    const generation = sessionGeneration.current;
     if (mounted.current) setRefreshing(true);
 
     try {
       const result = await fetchToken();
-      if (!mounted.current) {
-        return result.kind === "authenticated" ? result.session.user : null;
+
+      // A confirmed sign-out, a session change or an unmount invalidates this
+      // result entirely. In particular, an old stale 401 must never reach the
+      // cookie-clearing branch after a newer login.
+      if (
+        !mounted.current ||
+        generation !== sessionGeneration.current ||
+        isStaleTokenResult(result)
+      ) {
+        return { kind: "unauthenticated", message: "Session changed." };
       }
 
       switch (result.kind) {
         case "authenticated":
           setUser(result.session.user);
+          setSessionState("authenticated");
           setAuthError(null);
           setLoading(false);
-          return result.session.user;
+          break;
         case "unauthenticated":
           // A genuine 401 is the only case that clears a valid session.
           setUser(null);
-          setAuthError(null);
+          setFavoriteIds([]);
+          setSessionState("signedOut");
+          setAuthError(
+            result.sessionExpired
+              ? { kind: "sessionExpired", message: SESSION_EXPIRED_MESSAGE }
+              : null,
+          );
           setLoading(false);
-          return null;
+          if (result.sessionExpired) {
+            // Use the result's own epoch, not the current one: a session change
+            // between validation and cleanup must invalidate this cleanup too.
+            void clearStaleSessionCookie(result.epoch ?? getAuthEpoch());
+          }
+          break;
         case "forbidden":
           setUser(null);
+          setFavoriteIds([]);
+          setSessionState("signedOut");
           setAuthError({ kind: "forbidden", message: result.message });
           setLoading(false);
-          return null;
+          break;
         case "unavailable":
-          // Keep both the user and the in-memory token untouched.
+          // Keep both the user and the in-memory token untouched. The explicit
+          // state lets consumers show retry instead of a Sign In prompt.
+          setSessionState("unavailable");
           setAuthError({ kind: "unavailable", message: result.message });
           setLoading(false);
-          return null;
+          break;
       }
+
+      return result;
     } finally {
-      if (mounted.current) setRefreshing(false);
+      if (
+        mounted.current &&
+        generation === sessionGeneration.current
+      ) {
+        setRefreshing(false);
+      }
     }
-  }, []);
+  }, [clearStaleSessionCookie]);
+
+  const refresh = useCallback(async () => {
+    const result = await refreshSession();
+    return result.kind === "authenticated" ? result.session.user : null;
+  }, [refreshSession]);
 
   useEffect(() => {
     void refresh();
@@ -149,6 +293,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
+  const updateUser = useCallback((next: UserProfile | null) => {
+    setUser(next);
+    setSessionState(next ? "authenticated" : "signedOut");
+    if (!next) setAuthError(null);
+  }, []);
+
   const signOut = useCallback(() => {
     // Concurrent clicks share one request instead of issuing duplicate
     // Better Auth sign-out calls.
@@ -172,11 +322,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Only a confirmed success may destroy local session state.
-        clearAccessToken();
+        // Only a confirmed success may destroy local session state. The epoch
+        // bump also prevents an older refresh from restoring the JWT.
+        completeSessionChange();
         if (mounted.current) {
           setUser(null);
           setFavoriteIds([]);
+          setSessionState("signedOut");
+          setAuthError(null);
+          setRefreshing(false);
           setSignOutEpoch((value) => value + 1);
         }
         toast.success("You have been signed out.");
@@ -195,7 +349,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return operation;
-  }, [router]);
+  }, [completeSessionChange, router]);
 
   const toggleFavorite = useCallback(
     async (itemId: string) => {
@@ -236,12 +390,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
+      sessionState,
       loading,
       refreshing,
       authError,
       favoriteIds,
       refresh,
-      setUser,
+      refreshSession,
+      beginSessionChange,
+      completeSessionChange,
+      setUser: updateUser,
       signOut,
       signingOut,
       signOutEpoch,
@@ -249,11 +407,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [
       user,
+      sessionState,
       loading,
       refreshing,
       authError,
       favoriteIds,
       refresh,
+      refreshSession,
+      beginSessionChange,
+      completeSessionChange,
+      updateUser,
       signOut,
       signingOut,
       signOutEpoch,

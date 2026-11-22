@@ -59,6 +59,7 @@ const authenticated: TokenRefreshResult = {
 function Probe() {
   const {
     user,
+    sessionState,
     authError,
     refreshing,
     signingOut,
@@ -69,6 +70,7 @@ function Probe() {
   return (
     <div>
       <span data-testid="user">{user?.id ?? "none"}</span>
+      <span data-testid="session-state">{sessionState}</span>
       <span data-testid="error">
         {authError ? `${authError.kind}:${authError.message}` : "none"}
       </span>
@@ -96,6 +98,7 @@ function deferred<T>() {
 describe("AuthProvider.refresh classification", () => {
   beforeEach(() => {
     mocks.fetchToken.mockReset();
+    mocks.signOut.mockReset();
     mocks.listFavorites.mockReset();
     mocks.listFavorites.mockResolvedValue({ items: [] });
     mocks.replace.mockClear();
@@ -126,6 +129,7 @@ describe("AuthProvider.refresh classification", () => {
       ),
     );
     expect(screen.getByTestId("user").textContent).toBe(testUser.id);
+    expect(screen.getByTestId("session-state").textContent).toBe("unavailable");
   });
 
   it("keeps an existing user when refresh hits a network failure", async () => {
@@ -176,6 +180,140 @@ describe("AuthProvider.refresh classification", () => {
       expect(screen.getByTestId("user").textContent).toBe("none"),
     );
     expect(screen.getByTestId("error").textContent).toBe("none");
+    expect(screen.getByTestId("session-state").textContent).toBe("signedOut");
+    expect(mocks.signOut).not.toHaveBeenCalled();
+  });
+
+  it("clears a stale session and removes the unusable cookie on an expired 401", async () => {
+    mocks.fetchToken
+      .mockResolvedValueOnce(authenticated)
+      .mockResolvedValueOnce({
+        kind: "unauthenticated",
+        message: "Your session has expired. Please sign in again.",
+        sessionExpired: true,
+      });
+    mocks.signOut.mockResolvedValue({ data: { success: true }, error: null });
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("user").textContent).toBe(testUser.id),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("error").textContent).toBe(
+        "sessionExpired:Your session has expired. Please sign in again.",
+      ),
+    );
+    expect(screen.getByTestId("user").textContent).toBe("none");
+    expect(screen.getByTestId("session-state").textContent).toBe("signedOut");
+    expect(mocks.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("deduplicates concurrent stale 401 cleanups for the same session", async () => {
+    const stale = (): TokenRefreshResult => ({
+      kind: "unauthenticated",
+      message: "Your session has expired. Please sign in again.",
+      sessionExpired: true,
+    });
+    const cleanup = deferred<{ data: { success: boolean }; error: null }>();
+    mocks.fetchToken
+      .mockResolvedValueOnce(authenticated)
+      .mockResolvedValueOnce(stale())
+      .mockResolvedValueOnce(stale());
+    mocks.signOut.mockReturnValue(cleanup.promise);
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("user").textContent).toBe(testUser.id),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+
+    await waitFor(() => expect(mocks.signOut).toHaveBeenCalledTimes(1));
+    cleanup.resolve({ data: { success: true }, error: null });
+    await waitFor(() =>
+      expect(screen.getByTestId("error").textContent).toContain(
+        "sessionExpired:Your session has expired",
+      ),
+    );
+    expect(mocks.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows recovery guidance when stale cleanup resolves an error", async () => {
+    mocks.fetchToken
+      .mockResolvedValueOnce(authenticated)
+      .mockResolvedValueOnce({
+        kind: "unauthenticated",
+        message: "Your session has expired. Please sign in again.",
+        sessionExpired: true,
+      });
+    mocks.signOut.mockResolvedValue({
+      data: null,
+      error: { message: "Sign-out service is unavailable." },
+    });
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("user").textContent).toBe(testUser.id),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("error").textContent).toContain(
+        "couldn't clear the old session automatically",
+      ),
+    );
+    expect(screen.getByTestId("error").textContent).toContain(
+      "Sign-out service is unavailable.",
+    );
+    expect(screen.getByTestId("user").textContent).toBe("none");
+  });
+
+  it("shows recovery guidance when stale cleanup throws", async () => {
+    mocks.fetchToken
+      .mockResolvedValueOnce(authenticated)
+      .mockResolvedValueOnce({
+        kind: "unauthenticated",
+        message: "Your session has expired. Please sign in again.",
+        sessionExpired: true,
+      });
+    mocks.signOut.mockRejectedValue(new TypeError("Failed to fetch"));
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("user").textContent).toBe(testUser.id),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("error").textContent).toContain(
+        "couldn't clear the old session automatically",
+      ),
+    );
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "We couldn't clear the old session automatically. Reload the page if sign-in sends you back here.",
+    );
   });
 
   it("clears an existing user and preserves the blocked message on 403", async () => {
@@ -361,5 +499,31 @@ describe("AuthProvider.signOut", () => {
     expect(screen.getByTestId("signing-out").textContent).toBe("false");
     expect(getAccessToken()).toBeNull();
     expect(mocks.routerPush).toHaveBeenCalledWith("/");
+  });
+
+  it("does not let an in-flight refresh restore the user after sign-out", async () => {
+    const pendingRefresh = deferred<TokenRefreshResult>();
+    mocks.fetchToken.mockReturnValueOnce(pendingRefresh.promise);
+    mocks.signOut.mockResolvedValue({ data: { success: true }, error: null });
+
+    await renderSignedIn();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("refreshing").textContent).toBe("true"),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("user").textContent).toBe("none"),
+    );
+
+    pendingRefresh.resolve(authenticated);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("refreshing").textContent).toBe("false"),
+    );
+    expect(screen.getByTestId("user").textContent).toBe("none");
+    expect(screen.getByTestId("session-state").textContent).toBe("signedOut");
+    expect(getAccessToken()).toBeNull();
   });
 });

@@ -7,6 +7,7 @@ import {
   ArrowRight,
   ChevronDown,
   LayoutDashboard,
+  Loader2,
   LogOut,
   Menu,
   Settings,
@@ -30,7 +31,15 @@ const navLinks = [
 
 export function Navbar() {
   const pathname = usePathname();
-  const { user, loading, signOut, signingOut } = useAuth();
+  const {
+    user,
+    loading,
+    authError,
+    refreshing,
+    refresh,
+    signOut,
+    signingOut,
+  } = useAuth();
   const { count } = useCart();
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -65,6 +74,38 @@ export function Navbar() {
   }, [menuOpen]);
 
   const dashboardHref = user ? roleHome(user.role) : ROUTES.dashboardCustomer;
+  const authUnavailable = !user && authError ? (
+    <div
+      role="status"
+      className="flex items-center gap-2 rounded-full border border-brand-brown/15 bg-white/70 px-3 py-1.5 text-xs font-semibold text-brand-brown"
+    >
+      <span>
+        {authError.kind === "unavailable"
+          ? "Session check unavailable"
+          : authError.kind === "sessionExpired"
+            ? "Session expired"
+            : "Account access blocked"}
+      </span>
+      {authError.kind === "unavailable" ? (
+        <button
+          type="button"
+          onClick={() => void refresh()}
+          disabled={refreshing}
+          aria-busy={refreshing}
+          className="inline-flex items-center gap-1 font-bold text-brand-red hover:underline disabled:opacity-60"
+        >
+          {refreshing ? (
+            <Loader2 aria-hidden="true" className="size-3 animate-spin" />
+          ) : null}
+          Retry
+        </button>
+      ) : (
+        <Link href={ROUTES.signIn} className="font-bold text-brand-red hover:underline">
+          Sign in
+        </Link>
+      )}
+    </div>
+  ) : null;
 
   return (
     <header className="sticky top-0 z-50 border-b border-brand-brown/10 bg-cream/95 backdrop-blur-md">
@@ -115,6 +156,7 @@ export function Navbar() {
           {user?.role !== "vendor" && user?.role !== "admin" ? (
             <Link
               href={ROUTES.cart}
+              prefetch={user ? undefined : false}
               aria-label={
                 count > 0
                   ? `Cart, ${count} item${count === 1 ? "" : "s"}`
@@ -217,6 +259,8 @@ export function Navbar() {
                 </div>
               ) : null}
             </div>
+          ) : authUnavailable ? (
+            <div className="hidden md:block">{authUnavailable}</div>
           ) : (
             <>
               <Link
@@ -279,6 +323,7 @@ export function Navbar() {
             {user?.role !== "vendor" && user?.role !== "admin" ? (
               <Link
                 href={ROUTES.cart}
+                prefetch={user ? undefined : false}
                 onClick={() => setOpen(false)}
                 aria-label={
                   count > 0
@@ -353,6 +398,8 @@ export function Navbar() {
                   {signingOut ? "Signing out…" : "Sign out"}
                 </button>
               </>
+            ) : authUnavailable ? (
+              <div className="px-4 py-3">{authUnavailable}</div>
             ) : (
               <>
                 <Link

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Heart, Loader2, ShieldAlert } from "lucide-react";
 import { MenuGrid } from "@/components/menu/menu-grid";
+import { AuthStateNotice } from "@/components/shared/auth-state-notice";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Footer } from "@/components/shared/footer";
 import { Navbar } from "@/components/shared/navbar";
@@ -16,7 +17,14 @@ import { listFavorites } from "@/services/favorites";
 import type { MenuItem } from "@/types";
 
 export default function FavoritesPage() {
-  const { user, favoriteIds, loading: authLoading } = useAuth();
+  const {
+    user,
+    favoriteIds,
+    authError,
+    refreshing,
+    refresh,
+    loading: authLoading,
+  } = useAuth();
   const favoriteKey = favoriteIds.join(",");
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +78,12 @@ export default function FavoritesPage() {
                 <Loader2 aria-hidden="true" className="size-4 animate-spin" />
                 Loading your favourites…
               </div>
+            ) : !user && authError ? (
+              <AuthStateNotice
+                error={authError}
+                refreshing={refreshing}
+                onRetry={() => void refresh()}
+              />
             ) : !user ? (
               <EmptyState
                 icon={Heart}

@@ -71,6 +71,7 @@ export async function FeaturedMenu() {
               >
                 <Link
                   href={ROUTES.menuItem(item.id)}
+                  prefetch={false}
                   className="relative block aspect-[4/3] overflow-hidden bg-cream-deep"
                 >
                   <Image
@@ -98,7 +99,9 @@ export async function FeaturedMenu() {
                   </p>
 
                   <h3 className="mt-2 text-lg font-extrabold tracking-tight text-brand-brown transition-colors group-hover:text-brand-red">
-                    <Link href={ROUTES.menuItem(item.id)}>{item.itemName}</Link>
+                    <Link href={ROUTES.menuItem(item.id)} prefetch={false}>
+                      {item.itemName}
+                    </Link>
                   </h3>
                   <p className="mt-2 line-clamp-2 text-sm leading-6 text-brand-brown/55">
                     {item.description}
